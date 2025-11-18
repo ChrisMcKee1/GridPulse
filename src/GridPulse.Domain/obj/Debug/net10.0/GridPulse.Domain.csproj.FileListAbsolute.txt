@@ -1,0 +1,11 @@
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\bin\Debug\net10.0\GridPulse.Domain.deps.json
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\bin\Debug\net10.0\GridPulse.Domain.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\bin\Debug\net10.0\GridPulse.Domain.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.AssemblyInfoInputs.cache
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.AssemblyInfo.cs
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.csproj.CoreCompileInputs.cache
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\refint\GridPulse.Domain.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\GridPulse.Domain.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Domain\obj\Debug\net10.0\ref\GridPulse.Domain.dll

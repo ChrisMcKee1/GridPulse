@@ -1,0 +1,6 @@
+@GridPulse.WebApi_HostAddress = http://localhost:5244
+
+GET {{GridPulse.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

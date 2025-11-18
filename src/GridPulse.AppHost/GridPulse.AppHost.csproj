@@ -1,0 +1,16 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
+
+  <ItemGroup>
+    <ProjectReference Include="..\GridPulse.WebApi\GridPulse.WebApi.csproj" />
+    <ProjectReference Include="..\GridPulse.Web\GridPulse.Web\GridPulse.Web.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>df49a3e0-f2d9-4805-ae08-3d29bf328aba</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

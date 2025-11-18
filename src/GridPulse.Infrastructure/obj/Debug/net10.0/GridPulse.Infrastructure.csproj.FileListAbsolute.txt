@@ -1,0 +1,17 @@
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Infrastructure.deps.json
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Infrastructure.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Infrastructure.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Application.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Domain.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Domain.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\bin\Debug\net10.0\GridPulse.Application.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.AssemblyInfo.cs
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPuls.A04DC91F.Up2Date
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\refint\GridPulse.Infrastructure.dll
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\GridPulse.Infrastructure.pdb
+C:\Users\chrismckee\Downloads\DemoGH\Zava Power\src\GridPulse.Infrastructure\obj\Debug\net10.0\ref\GridPulse.Infrastructure.dll
