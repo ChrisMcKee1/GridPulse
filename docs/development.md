@@ -296,6 +296,18 @@ equipmentGroup.MapGet(
 }
 ```
 
+### Sample Data & Database Seeding
+
+- **Source of truth**: CSV files live under `sample-data/outages/`. `outages.csv` describes outage headers and `outage-events.csv` tracks each timeline entry.
+- **Copy to output**: `Directory.Build.props` links every file under `sample-data/` into each project and copies them into `bin/<tfm>/sample-data` so runtime hosts can always resolve them.
+- **Configuration**: `SampleData` settings in `src/GridPulse.WebApi/appsettings*.json` control the relative folder and file names. The defaults expect `sample-data` beside the repo root; point `RootPath` at an absolute path to override.
+- **Seeding workflow**: At startup the API migrates the database and runs each `IDataSeeder`. The CSV seeder inserts rows only when `outages` is empty so real data is never overwritten.
+- **Extending the dataset**:
+    1. Add rows to the CSVs or create additional CSVs under `sample-data/<category>/`.
+    2. Reference new files from a dedicated seeder (implement `IDataSeeder`) or update the existing CSV files.
+    3. Drop/truncate the target tables (or rebuild the database) before restarting the API to replay the sample data.
+- **Validation tips**: Keep GUIDs stable between related files, store timestamps as ISO 8601 strings, and use enum names (`Reported`, `CrewDispatched`, etc.) for hassle-free parsing.
+
 ---
 
 ### Aspire CLI Commands

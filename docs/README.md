@@ -43,13 +43,15 @@ GridPulse is an Aspire-orchestrated .NET 10 solution designed for power outage r
 The system uses:
 - **.NET 10** for backend services
 - **Aspire 13** for cloud-native orchestration
+- **GridPulse.ServiceDefaults** for shared OpenTelemetry, health checks, and HttpClient/service-discovery configuration
 - **Blazor Interactive Auto** for the web UI
 - **Minimal APIs** for REST endpoints
-- **In-memory storage** (with planned Oracle migration)
+- **PostgreSQL (Aspire-provisioned)** with EF Core migrations
 
 ## Contributing
 
 When contributing to GridPulse:
+
 1. Follow the Clean Architecture patterns established in the codebase
 2. Keep domain types immutable (use `init` setters)
 3. Use dependency injection for all services

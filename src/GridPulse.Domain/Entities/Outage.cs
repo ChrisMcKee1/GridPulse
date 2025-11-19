@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GridPulse.Domain.Entities;
 
 public sealed class Outage
@@ -10,5 +12,5 @@ public sealed class Outage
     public DateTimeOffset LastUpdatedAt { get; init; }
     public DateTimeOffset? EstimatedRestoration { get; init; }
     public string? Cause { get; init; }
-    public IReadOnlyCollection<OutageEvent> Events { get; init; } = Array.Empty<OutageEvent>();
+    public ICollection<OutageEvent> Events { get; init; } = new List<OutageEvent>();
 }

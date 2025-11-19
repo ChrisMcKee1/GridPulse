@@ -29,12 +29,12 @@ GridPulse follows a **Clean Architecture** pattern with clear separation of conc
 └─────────┼──────────────────────────────┼───────────────────┘
           │                              │
           │                              ▼
-          │                     ┌─────────────────┐
-          │                     │   Application   │
-          │                     │     Services    │
           │                     └─────────────────┘
-          │                              │
           │                              ▼
+          │                     ┌─────────────────┐
+          │                     │  Infrastructure │
+          └────────────────────▶│  (EF + Postgres)│
+                                └─────────────────┘
           │                     ┌─────────────────┐
           │                     │  Infrastructure │
           └────────────────────▶│  (In-Memory)    │
@@ -88,13 +88,14 @@ GridPulse follows a **Clean Architecture** pattern with clear separation of conc
 - Data persistence logic
 
 **Current Implementation**:
-- `InMemoryOutageRepository` - Seed data repository (temporary)
-- `OracleOptions` - Placeholder for future Oracle integration
+- `GridPulseDbContext` - EF Core context mapped to outages/outage events
+- `EfOutageRepository` - PostgreSQL-backed repository surfaced through DI
+- Aspire-managed PostgreSQL container declared in `GridPulse.AppHost`
 
 **Future Plans**:
-- Oracle database implementation using `System.Data.Common`
-- Azure Managed Identity for authentication
-- Caching layers
+- Promote to Azure Database for PostgreSQL Flexible Server with Managed Identity
+- Add caching layers and read models for operator dashboards
+- Introduce background workers for seeding/auditing data
 
 ### 4. Web API Layer (`GridPulse.WebApi`)
 **Purpose**: HTTP REST API using .NET Minimal APIs.
@@ -139,12 +140,14 @@ GridPulse follows a **Clean Architecture** pattern with clear separation of conc
 **Purpose**: Aspire orchestration and service configuration.
 
 **Responsibilities**:
+
 - Service discovery and registration
 - Inter-service communication
 - External endpoint configuration
 - Development environment orchestration
 
 **Configuration**:
+
 ```csharp
 var api = builder.AddProject<Projects.GridPulse_WebApi>("gridpulse-api");
 var web = builder.AddProject<Projects.GridPulse_Web>("gridpulse-web")
@@ -152,9 +155,25 @@ var web = builder.AddProject<Projects.GridPulse_Web>("gridpulse-web")
     .WithExternalHttpEndpoints();
 ```
 
+### 7. Service Defaults Layer (`GridPulse.ServiceDefaults`)
+
+**Purpose**: Provides a shared place for Aspire service defaults (OpenTelemetry, health checks, service discovery, and HttpClient resilience) that every runnable project references.
+
+**Responsibilities**:
+
+- Call `AddServiceDefaults` / `ConfigureOpenTelemetry` so APIs and the Blazor host emit consistent traces, metrics, and logs.
+- Centralize request/response enrichment logic (currently captures HTTP body text for Aspire dashboard inspection with a 4 KB guard).
+- Configure standard health endpoints (`/health`, `/alive`) and exclude them from noisy traces.
+- Apply the standard HttpClient resilience handler plus Aspire service discovery so typed clients can bind to `https+http://gridpulse-api` automatically.
+
+**Notes**:
+
+- Every ASP.NET Core project should reference `GridPulse.ServiceDefaults` and call both `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()`.
+- Update this project before adding bespoke middleware elsewhere; it keeps cross-cutting observability consistent with Aspire guidance.
+
 ## Project Structure
 
-```
+```text
 GridPulse/
 ├── src/
 │   ├── GridPulse.Domain/              # Domain entities & enums
@@ -180,10 +199,16 @@ GridPulse/
 │   │       └── OutageSummary.cs
 │   │
 │   ├── GridPulse.Infrastructure/      # Data access
-│   │   ├── Repositories/
-│   │   │   └── InMemoryOutageRepository.cs
-│   │   └── Options/
-│   │       └── OracleOptions.cs
+│   │   ├── Persistence/
+│   │   │   ├── GridPulseDbContext.cs
+│   │   │   ├── Configurations/
+│   │   │   │   ├── OutageConfiguration.cs
+│   │   │   │   └── OutageEventConfiguration.cs
+│   │   │   ├── Migrations/
+│   │   │   │   └── *InitialOutages*.cs
+│   │   │   └── SeedData.cs
+│   │   └── Repositories/
+│   │       └── EfOutageRepository.cs
 │   │
 │   ├── GridPulse.WebApi/              # REST API
 │   │   └── Program.cs
@@ -201,6 +226,8 @@ GridPulse/
 │   │   │       └── GridPulseApiClient.cs
 │   │   └── GridPulse.Web.Client/      # WASM client
 │   │
+│   ├── GridPulse.ServiceDefaults/     # Shared telemetry + resilience defaults for Aspire
+│   │
 │   ├── GridPulse.AppHost/             # Aspire orchestration
 │   │   └── AppHost.cs
 │   │
@@ -213,24 +240,28 @@ GridPulse/
 ## Technology Stack
 
 ### Backend
+
 - **.NET 10** - Latest .NET platform
 - **C# 13** - Language features
 - **ASP.NET Core Minimal APIs** - HTTP endpoints
-- **System.Data.Common** - Database abstraction (future Oracle integration)
+- **EF Core + Npgsql** - PostgreSQL persistence
 
 ### Frontend
+
 - **Blazor Interactive Auto** - Hybrid rendering mode
 - **Blazor WebAssembly** - Client-side execution
 - **Radzen Blazor Components** - UI component library
 - **CSS/HTML5** - Styling and markup
 
 ### Infrastructure
+
 - **.NET Aspire 13** - Cloud-native orchestration
 - **Scalar** - API documentation (replaces Swagger)
-- **In-Memory Storage** - Current data layer (temporary)
-- **Oracle Database** - Planned production database
+- **PostgreSQL (Aspire add-on)** - Local development database
+- **Azure Database for PostgreSQL / Flexible Server** - Planned managed offering
 
 ### Development Tools
+
 - **Aspire CLI** - Project management and orchestration
 - **xUnit** - Unit testing framework
 - **Git** - Version control
@@ -238,31 +269,37 @@ GridPulse/
 ## Design Principles
 
 ### 1. **Clean Architecture**
+
 - Clear separation of concerns
 - Dependency inversion (dependencies point inward)
 - Business logic isolated from infrastructure
 
 ### 2. **Immutability**
+
 - Domain entities use `init` setters
 - Promotes thread safety and predictable behavior
 - Simplifies reasoning about state
 
 ### 3. **Dependency Injection**
+
 - Constructor injection for all dependencies
 - No static singletons
 - Microsoft.Extensions.DependencyInjection
 
 ### 4. **API-First Design**
+
 - Minimal APIs with explicit contracts
 - OpenAPI documentation
 - Versioned endpoints (future)
 
 ### 5. **Separation of UI and Logic**
+
 - Typed API client (`GridPulseApiClient`)
 - No direct database access from UI
 - Clear data flow
 
 ### 6. **Cloud-Native Patterns**
+
 - Aspire for orchestration
 - Health checks
 - Configuration management
@@ -271,6 +308,7 @@ GridPulse/
 ## Integration Points
 
 ### Current Integrations
+
 1. **Aspire AppHost** ↔ **WebApi** - Service orchestration
 2. **Aspire AppHost** ↔ **Web UI** - Service orchestration with API reference
 3. **Web UI** ↔ **WebApi** - HTTPS/JSON over configured base URL
@@ -278,7 +316,8 @@ GridPulse/
 5. **Application Services** ↔ **Infrastructure** - Repository pattern
 
 ### Planned Integrations
-1. **Oracle Database** - Production data persistence
+
+1. **Azure Database for PostgreSQL** - Production data persistence
 2. **Microsoft Entra B2C** - Customer authentication
 3. **Microsoft Entra ID** - Operator authentication
 4. **Azure Managed Identity** - Secure database connections
@@ -289,16 +328,19 @@ GridPulse/
 ## Configuration
 
 ### API Configuration (`appsettings.json`)
+
 - Logging levels
 - CORS policies
 - Database connection strings (future)
 
 ### Web UI Configuration
+
 - `Api:BaseAddress` - API endpoint (defaults to `https://localhost:7143`)
 - Blazor render modes
 - Component settings
 
 ### Aspire Configuration
+
 - Service endpoints
 - Port bindings (API: 7143)
 - External HTTP endpoints
@@ -307,11 +349,13 @@ GridPulse/
 ## Security Considerations
 
 ### Current State
+
 - HTTPS enforcement
 - CORS configuration
 - Problem details for error handling
 
 ### Planned Security Features
+
 - Microsoft Entra authentication
 - Role-based authorization (Customer vs Operator)
 - API key management
@@ -322,11 +366,13 @@ GridPulse/
 ## Scalability and Performance
 
 ### Current Approach
-- In-memory repository for development
+
+- Aspire-provisioned PostgreSQL container with EF Core migrations
 - Async/await throughout
 - Minimal API overhead
 
 ### Future Optimizations
+
 - Database connection pooling
 - Response caching
 - CDN for static assets
@@ -336,12 +382,14 @@ GridPulse/
 ## Monitoring and Observability
 
 ### Current Capabilities
+
 - Health check endpoint
 - Aspire dashboard
-- Application logging
+- Application logging configured through `GridPulse.ServiceDefaults`
 
 ### Planned Enhancements
-- Application Insights integration
-- Distributed tracing
+
+- Application Insights integration via Service Defaults exporters
+- Distributed tracing (already wired through Service Defaults OpenTelemetry setup)
 - Performance metrics
 - Alert configurations

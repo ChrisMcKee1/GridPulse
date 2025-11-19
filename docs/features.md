@@ -253,24 +253,22 @@ This document describes all features currently implemented in GridPulse. Feature
 
 ## Infrastructure
 
-### ✅ In-Memory Repository
-**Status**: Fully Implemented (Temporary)  
-**Description**: In-memory data store with seed data for development.
+### ✅ PostgreSQL Repository
+**Status**: Fully Implemented  
+**Description**: EF Core persistence backed by a PostgreSQL database provisioned through Aspire.
 
 **Features**:
-- Static seed data collection
-- Implements `IOutageRepository`
-- Sample outage with events
-- Asynchronous API (Task-based)
+- `GridPulseDbContext` with entity configurations + seed data
+- `EfOutageRepository` wired through DI
+- Initial migration (`InitialOutages`) for outages and events
+- Asynchronous query APIs with `AsNoTracking`
 
 **Seed Data**:
 - 1 sample outage in "CrewDispatched" status
 - Service location: "123 Contoso Ave, Apex, NC"
-- Includes status change event
+- Includes a status change event seeded through migrations
 
-**Implementation**: `GridPulse.Infrastructure.Repositories.InMemoryOutageRepository`
-
-**Note**: This will be replaced with Oracle database implementation.
+**Implementation**: `GridPulse.Infrastructure.Persistence.*`, `GridPulse.Infrastructure.Repositories.EfOutageRepository`
 
 ### ✅ Repository Abstraction
 **Status**: Fully Implemented  
@@ -296,20 +294,21 @@ This document describes all features currently implemented in GridPulse. Feature
 - `IOutageReadService` → `OutageReadService`
 
 **Infrastructure Services**:
-- `IOutageRepository` → `InMemoryOutageRepository`
+- `IOutageRepository` → `EfOutageRepository`
 
 **Extensions**:
 - `GridPulse.Application.ServiceCollectionExtensions`
 - `GridPulse.Infrastructure.ServiceCollectionExtensions`
 
-### ✅ Configuration Binding
+### ✅ Connection Strings & Design-Time Support
 **Status**: Fully Implemented  
-**Description**: Strongly-typed configuration options.
+**Description**: `ConnectionStrings:gridpulse-db` feeds both Aspire-less local runs and migrations.
 
-**Options Classes**:
-- `OracleOptions` - Placeholder for Oracle connection configuration
+**Artifacts**:
+- `appsettings*.json` entries for `gridpulse-db`
+- `DesignTimeGridPulseDbContextFactory` for `dotnet ef`
 
-**Pattern**: IOptions pattern with section binding
+**Pattern**: IOptions/ConfigurationBuilder with environment overrides
 
 ---
 
@@ -472,7 +471,7 @@ This document describes all features currently implemented in GridPulse. Feature
 | Usage Tracking | ✅ Domain model | ❌ Data integration |
 | Notifications | ✅ Preferences model | ❌ Delivery service |
 | Authentication | ❌ Not started | ❌ Entra integration |
-| Database | ✅ In-memory | ❌ Oracle migration |
+| Database | ✅ PostgreSQL (Aspire-managed) | ❌ Azure-managed Postgres + MI |
 | API | ✅ Read endpoints | ❌ Write endpoints |
 | UI | ✅ Dashboard | ❌ Customer portal |
 | Testing | ✅ Unit test project | ❌ Integration tests |
@@ -484,7 +483,7 @@ This document describes all features currently implemented in GridPulse. Feature
 The following features are planned but not yet implemented:
 
 ### High Priority
-- ❌ **Oracle Database Integration** - Replace in-memory storage
+- ❌ **Azure PostgreSQL Hardening** - Managed Identity + production-ready replicas
 - ❌ **Write Operations** - Create, update outages
 - ❌ **Authentication/Authorization** - Microsoft Entra (B2C & ID)
 - ❌ **Real-time Updates** - SignalR integration

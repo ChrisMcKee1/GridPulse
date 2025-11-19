@@ -2,9 +2,15 @@ using System.Text.Json.Serialization;
 using GridPulse.Application;
 using GridPulse.Application.Services;
 using GridPulse.Infrastructure;
+using GridPulse.Infrastructure.Persistence;
+using GridPulse.WebApi.Extensions;
+using Microsoft.Extensions.Hosting;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddNpgsqlDbContext<GridPulseDbContext>("gridpulse-db");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
@@ -35,6 +41,7 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("Default");
+app.MapDefaultEndpoints();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }));
 
@@ -58,5 +65,7 @@ outagesGroup.MapGet(
         return outage is null ? Results.NotFound() : Results.Ok(outage);
     })
     .WithName("GetOutageById");
+
+await app.Services.InitializeDatabaseAsync();
 
 app.Run();

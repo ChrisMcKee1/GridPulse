@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <SampleDataRoot>$(MSBuildThisFileDirectory)sample-data\</SampleDataRoot>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(SampleDataRoot)')">
+    <None Include="$(SampleDataRoot)**\*.*"
+          Link="sample-data\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

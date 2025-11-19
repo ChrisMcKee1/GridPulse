@@ -8,9 +8,10 @@ GridPulse is an Aspire-orchestrated .NET 9/10 solution for the outage & usage po
 src/
   GridPulse.Domain            // Entities + enums
   GridPulse.Application       // Application services + abstractions
-  GridPulse.Infrastructure    // Infrastructure services (temporary in-memory repo)
+  GridPulse.Infrastructure    // Infrastructure services (EF Core + PostgreSQL persistence)
   GridPulse.WebApi            // Minimal API surface for outages
   GridPulse.Web               // Blazor Web App (Interactive Auto) + WASM client
+  GridPulse.ServiceDefaults   // Shared Aspire defaults (OpenTelemetry, health checks, service discovery)
   GridPulse.AppHost           // Aspire AppHost orchestrating API + Web
   GridPulse.Tests.Unit        // xUnit placeholder tests
 ```
@@ -37,7 +38,7 @@ cd "C:\Users\chrismckee\Downloads\DemoGH\Zava Power"
 aspire run --project src\GridPulse.AppHost\AppHost.cs
 ```
 
-The AppHost maps the API at `https://localhost:7143` and the Blazor Web App with external HTTP endpoints. The Blazor UI consumes the API through a typed `GridPulseApiClient` whose base address defaults to the same port (override via `Api:BaseAddress` in `appsettings.*`).
+The AppHost maps the API at `https://localhost:7143` and the Blazor Web App with external HTTP endpoints. The Blazor UI consumes the API through a typed `GridPulseApiClient` whose base address defaults to the same port (override via `Api:BaseAddress` in `appsettings.*`). Cross-cutting telemetry, health endpoints, and HttpClient resilience live in `GridPulse.ServiceDefaults`; every ASP.NET Core project should reference it and call `builder.AddServiceDefaults()` / `app.MapDefaultEndpoints()`.
 
 ## Aspire CLI workflows
 
@@ -51,7 +52,7 @@ These quick commands mirror the cheat sheet in `.github/instructions/aspire-cli.
 
 ## Next steps
 
-1. Replace the in-memory outage repository with an Oracle-backed implementation using `System.Data.Common` and Managed Identity.
+1. Extend the new PostgreSQL + EF Core stack beyond outages (usage, notifications) and harden connection management for cloud environments.
 2. Add authentication/authorization via Microsoft Entra (B2C for customers, Entra ID for operators) and enforce roles across API/Web.
 3. Flesh out the domain/application layers with additional services (usage readings, notification preferences) and expand API endpoints per the PRD.
 4. Add Radzen components and richer dashboards to the Blazor UI, plus tests (unit + integration + Playwright).

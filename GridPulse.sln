@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridPulse.AppHost", "src\Gr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridPulse.Tests.Unit", "src\GridPulse.Tests.Unit\GridPulse.Tests.Unit.csproj", "{D61F653C-C407-4761-9A15-2A1CC82476EF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridPulse.ServiceDefaults", "src\GridPulse.ServiceDefaults\GridPulse.ServiceDefaults.csproj", "{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +131,18 @@ Global
 		{D61F653C-C407-4761-9A15-2A1CC82476EF}.Release|x64.Build.0 = Release|Any CPU
 		{D61F653C-C407-4761-9A15-2A1CC82476EF}.Release|x86.ActiveCfg = Release|Any CPU
 		{D61F653C-C407-4761-9A15-2A1CC82476EF}.Release|x86.Build.0 = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|x64.Build.0 = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Debug|x86.Build.0 = Debug|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|x64.ActiveCfg = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|x64.Build.0 = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|x86.ActiveCfg = Release|Any CPU
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -143,5 +157,6 @@ Global
 		{40B046EB-53F7-4C95-8F39-1A5518493A53} = {8C6C5EC1-15BC-F097-EBC4-699D26B6A99A}
 		{217E6070-93F9-4BF7-B91B-BE4647E0BD97} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{D61F653C-C407-4761-9A15-2A1CC82476EF} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A43775A1-E1FC-4371-8D3C-A5F65E84B5CC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

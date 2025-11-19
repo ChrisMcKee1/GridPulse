@@ -7,13 +7,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.5.2" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Scalar.AspNetCore" Version="2.10.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GridPulse.Application\GridPulse.Application.csproj" />
     <ProjectReference Include="..\GridPulse.Infrastructure\GridPulse.Infrastructure.csproj" />
+    <ProjectReference Include="..\GridPulse.ServiceDefaults\GridPulse.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,11 @@
 using GridPulse.Web.Components;
 using GridPulse.Web.Services;
+using Microsoft.Extensions.Hosting;
 using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
@@ -12,6 +14,11 @@ builder.Services.AddRazorComponents()
 builder.Services.AddServiceDiscovery();
 
 builder.Services.AddRadzenComponents();
+builder.Services.AddScoped<DialogService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<TooltipService>();
+builder.Services.AddScoped<ContextMenuService>();
+builder.Services.AddScoped<ThemeService>();
 
 builder.Services.AddHttpClient<GridPulseApiClient>((serviceProvider, client) =>
     {
@@ -47,6 +54,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapDefaultEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()

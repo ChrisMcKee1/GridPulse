@@ -266,6 +266,18 @@ ServiceFabricBackup/
 *.ldf
 *.ndf
 
+# SQLite / local EF Core databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-journal
+
+# Local appsettings overrides (secrets)
+appsettings.Local.json
+appsettings.*.local.json
+
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout
