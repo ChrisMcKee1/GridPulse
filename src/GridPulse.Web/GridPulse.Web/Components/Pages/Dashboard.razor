@@ -1,0 +1,105 @@
+﻿@page "/"
+@using GridPulse.Web.Services.Models
+@inject GridPulse.Web.Services.GridPulseApiClient ApiClient
+
+<PageTitle>Zava Power · GridPulse</PageTitle>
+
+@if (isLoading)
+{
+	<RadzenSkeleton Width="100%" Height="320px" />
+}
+else if (outages.Count == 0)
+{
+	<RadzenAlert Severity="AlertSeverity.Info" Summary="All clear" Detail="There are no active outages at the moment." />
+}
+else
+{
+	<DashboardTemplate>
+		<PrimaryKpis>
+			<KpiStat Title="Active outages" Value="@ActiveOutages" Trend="@CrewCoverage" />
+			<KpiStat Title="Customers impacted" Value="@ImpactedCustomers" Trend="@RestorationEta" />
+			<KpiStat Title="Crews dispatched" Value="@CrewsDispatched" Trend="@DispatchTrend" />
+		</PrimaryKpis>
+		<HeroContent>
+			<UsageTrendCard Title="Daily demand" DateRange="@UsageRange" Data="@usageTrend" />
+			<RadzenStack Orientation="Orientation.Vertical" Gap="16">
+				@foreach (var outage in topOutages)
+				{
+					<OutageSummaryCard Outage="@outage" />
+				}
+			</RadzenStack>
+		</HeroContent>
+		<DetailContent>
+			<OutageGrid Outages="@outages" />
+			<OutageActivityTimeline Items="@activity" />
+		</DetailContent>
+	</DashboardTemplate>
+}
+
+@code {
+	private IReadOnlyList<OutageSummaryResponse> outages = Array.Empty<OutageSummaryResponse>();
+	private IReadOnlyList<OutageSummaryResponse> topOutages = Array.Empty<OutageSummaryResponse>();
+	private IReadOnlyList<UsageTrendPoint> usageTrend = Array.Empty<UsageTrendPoint>();
+	private IReadOnlyList<OutageActivityItem> activity = Array.Empty<OutageActivityItem>();
+	private bool isLoading = true;
+
+	private string ActiveOutages => outages.Count(o => !string.Equals(o.Status, "Resolved", StringComparison.OrdinalIgnoreCase)).ToString("N0");
+	private string ImpactedCustomers => outages.Sum(o => o.AffectedCustomers).ToString("N0");
+	private string CrewsDispatched => outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)).ToString("N0");
+
+	private string CrewCoverage => $"{CrewDeploymentPercentage:P0} crews engaged";
+	private string RestorationEta => $"{UpcomingRestorations} restorations due in 2h";
+	private string DispatchTrend => $"{DispatchDelta:+#;-#;0} vs yesterday";
+	private string UsageRange => $"{DateTime.Today.AddDays(-usageTrend.Count + 1):MMM d} – {DateTime.Today:MMM d}";
+
+	private double CrewDeploymentPercentage => outages.Count == 0
+		? 0
+		: (double)outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)) / outages.Count;
+
+	private int UpcomingRestorations => outages.Count(o => o.EstimatedRestoration is not null && o.EstimatedRestoration <= DateTimeOffset.UtcNow.AddHours(2));
+
+	private int DispatchDelta => Math.Clamp(outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)) - 3, -9, 9);
+
+	protected override async Task OnInitializedAsync()
+	{
+		outages = await ApiClient.GetRecentOutagesAsync();
+		topOutages = outages
+			.OrderByDescending(o => o.AffectedCustomers)
+			.ThenByDescending(o => o.ReportedAt)
+			.Take(3)
+			.ToArray();
+		usageTrend = BuildUsageTrend(outages);
+		activity = BuildActivity(outages);
+		isLoading = false;
+	}
+
+	private static IReadOnlyList<UsageTrendPoint> BuildUsageTrend(IEnumerable<OutageSummaryResponse> source)
+	{
+		var baseline = Math.Max(source.Sum(o => o.AffectedCustomers) / 25m, 50m);
+		var today = DateTime.Today;
+		return Enumerable.Range(0, 14)
+			.Select(offset => new UsageTrendPoint(today.AddDays(-13 + offset), baseline + (decimal)Math.Sin(offset / 2d) * 15))
+			.ToArray();
+	}
+
+	private static IReadOnlyList<OutageActivityItem> BuildActivity(IEnumerable<OutageSummaryResponse> source)
+	{
+		return source
+			.OrderByDescending(o => o.LastUpdatedAt)
+			.Take(6)
+			.Select(o => new OutageActivityItem(
+				o.ServiceAddress,
+				o.Cause ?? "Investigation ongoing",
+				o.LastUpdatedAt,
+				ToVariant(o.Status)))
+			.ToArray();
+	}
+
+	private static string ToVariant(string status) => status switch
+	{
+		"Resolved" => "Success",
+		"CrewDispatched" => "Warning",
+		"Acknowledged" => "Info",
+		_ => "Default"
+	};
+}

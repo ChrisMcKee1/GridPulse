@@ -1,6 +1,14 @@
-@GridPulse.WebApi_HostAddress = http://localhost:5244
+@GridPulse.WebApi_HostAddress = https://localhost:7143
 
-GET {{GridPulse.WebApi_HostAddress}}/weatherforecast/
+### Ping API health
+GET {{GridPulse.WebApi_HostAddress}}/api/health
 Accept: application/json
 
-###
+### List recent outages
+GET {{GridPulse.WebApi_HostAddress}}/api/outages
+Accept: application/json
+
+### Get outage by id
+@OutageId = 00000000-0000-0000-0000-000000000000
+GET {{GridPulse.WebApi_HostAddress}}/api/outages/{{OutageId}}
+Accept: application/json

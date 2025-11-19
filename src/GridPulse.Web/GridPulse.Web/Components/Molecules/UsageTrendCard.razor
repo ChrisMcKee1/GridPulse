@@ -1,0 +1,25 @@
+@using GridPulse.Web.Components.Molecules.Models
+@using Radzen.Blazor
+
+<RadzenCard Class="usage-card">
+    <div class="usage-card__header">
+        <div>
+            <span class="label">Usage</span>
+            <h4>@Title</h4>
+        </div>
+        <span>@DateRange</span>
+    </div>
+    <RadzenChart Style="height:220px">
+        <RadzenCategoryAxis />
+        <RadzenValueAxis />
+        <RadzenLineSeries Data="Data"
+                          CategoryProperty="Date"
+                          ValueProperty="KilowattHours" />
+    </RadzenChart>
+</RadzenCard>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Demand";
+    [Parameter] public string DateRange { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<UsageTrendPoint> Data { get; set; } = Array.Empty<UsageTrendPoint>();
+}

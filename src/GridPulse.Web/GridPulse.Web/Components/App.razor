@@ -9,15 +9,20 @@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["GridPulse.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/Radzen.Blazor/css/material-base.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/Radzen.Blazor/css/material.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
 </head>
 
 <body>
+    <RadzenTheme Theme="material" @rendermode="InteractiveAuto" />
     <Routes />
+    <RadzenComponents @rendermode="InteractiveAuto" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/Radzen.Blazor/Radzen.Blazor.js"]"></script>
 </body>
 
 </html>

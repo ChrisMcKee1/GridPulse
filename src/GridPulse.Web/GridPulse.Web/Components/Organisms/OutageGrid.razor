@@ -1,0 +1,32 @@
+@using GridPulse.Web.Services.Models
+
+<RadzenDataGrid Data="Outages" TItem="OutageSummaryResponse" AllowPaging="true" AllowSorting="true" PageSize="10"
+                Responsive="true" Class="outage-grid">
+    <Columns>
+        <RadzenDataGridColumn TItem="OutageSummaryResponse" Property="ServiceAddress" Title="Service Address" />
+        <RadzenDataGridColumn TItem="OutageSummaryResponse" Title="Status">
+            <Template Context="item">
+                <StatusChip Label="@item.Status" Variant="@GetVariant(item.Status)" />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="OutageSummaryResponse" Property="ReportedAt" Title="Reported">
+            <Template Context="item">@item.ReportedAt.ToLocalTime().ToString("g")</Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="OutageSummaryResponse" Title="ETA">
+            <Template Context="item">@(item.EstimatedRestoration?.ToLocalTime().ToString("t") ?? "TBD")</Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="OutageSummaryResponse" Property="AffectedCustomers" Title="Affected" />
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [Parameter] public IReadOnlyList<OutageSummaryResponse> Outages { get; set; } = Array.Empty<OutageSummaryResponse>();
+
+    private static string GetVariant(string status) => status switch
+    {
+        "Resolved" => "success",
+        "CrewDispatched" => "warning",
+        "Acknowledged" => "info",
+        _ => "default"
+    };
+}

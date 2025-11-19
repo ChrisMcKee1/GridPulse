@@ -1,0 +1,28 @@
+<RadzenStack Orientation="Orientation.Vertical" Gap="24" Class="dashboard-template">
+    <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="16">
+        @if (PrimaryKpis is not null)
+        {
+            @PrimaryKpis
+        }
+    </RadzenStack>
+
+    @if (HeroContent is not null)
+    {
+        <div class="dashboard-template__hero">
+            @HeroContent
+        </div>
+    }
+
+    @if (DetailContent is not null)
+    {
+        <div class="dashboard-template__detail">
+            @DetailContent
+        </div>
+    }
+</RadzenStack>
+
+@code {
+    [Parameter] public RenderFragment? PrimaryKpis { get; set; }
+    [Parameter] public RenderFragment? HeroContent { get; set; }
+    [Parameter] public RenderFragment? DetailContent { get; set; }
+}

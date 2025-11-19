@@ -1,6 +1,6 @@
-using GridPulse.Web.Client.Pages;
 using GridPulse.Web.Components;
 using GridPulse.Web.Services;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +10,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
 builder.Services.AddServiceDiscovery();
+
+builder.Services.AddRadzenComponents();
 
 builder.Services.AddHttpClient<GridPulseApiClient>((serviceProvider, client) =>
     {

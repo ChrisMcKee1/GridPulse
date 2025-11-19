@@ -1,0 +1,9 @@
+<span class="status-chip status-chip--@Variant">
+    <span class="status-chip__indicator"></span>
+    <span>@Label</span>
+</span>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Variant { get; set; } = "default";
+}

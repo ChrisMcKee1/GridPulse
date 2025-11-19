@@ -58,3 +58,144 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.dashboard-template {
+    padding: 1rem 0 2rem;
+}
+
+.dashboard-template__hero,
+.dashboard-template__detail {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.dashboard-template__hero {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.dashboard-template__detail {
+    grid-template-columns: 2fr 1fr;
+}
+
+@media (max-width: 992px) {
+    .dashboard-template__detail {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kpi-card {
+    min-width: 220px;
+}
+
+.kpi-card__labels {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.kpi-card__title {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+
+.kpi-card__value-group {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.kpi-card__value {
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.kpi-card__trend {
+    color: #16a34a;
+    font-weight: 500;
+}
+
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.status-chip__indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.status-chip--success {
+    background-color: #ecfdf5;
+    color: #047857;
+}
+
+.status-chip--warning {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+.status-chip--info {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+}
+
+.outage-card__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+}
+
+.outage-card__body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.outage-card__body .label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+
+.outage-grid .rz-datatable-thead th {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.usage-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.timeline-item {
+    padding-bottom: 0.75rem;
+}
+
+.timeline-item__meta {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}

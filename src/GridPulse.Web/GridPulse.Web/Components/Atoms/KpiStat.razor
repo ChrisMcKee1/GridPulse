@@ -1,0 +1,37 @@
+@using Radzen
+
+<RadzenCard Class="@CssClass">
+    <div class="kpi-card__labels">
+        <span class="kpi-card__title">@Title</span>
+        @if (!string.IsNullOrWhiteSpace(SubTitle))
+        {
+            <span class="kpi-card__subtitle">@SubTitle</span>
+        }
+    </div>
+    <div class="kpi-card__value-group">
+        <span class="kpi-card__value">@Value</span>
+        @if (!string.IsNullOrWhiteSpace(Trend))
+        {
+            <span class="kpi-card__trend">@Trend</span>
+        }
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="kpi-card__detail">
+            @ChildContent
+        </div>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? SubTitle { get; set; }
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Trend { get; set; }
+    [Parameter] public string? AdditionalCssClass { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string CssClass => string.IsNullOrWhiteSpace(AdditionalCssClass)
+        ? "kpi-card"
+        : $"kpi-card {AdditionalCssClass}";
+}

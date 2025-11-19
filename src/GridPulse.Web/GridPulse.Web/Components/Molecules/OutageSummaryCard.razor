@@ -1,0 +1,39 @@
+@using GridPulse.Web.Services.Models
+
+<RadzenCard Class="outage-card">
+    <div class="outage-card__header">
+        <div>
+            <h4>@Outage.ServiceAddress</h4>
+            <small>@Outage.ReportedAt.ToLocalTime().ToString("f")</small>
+        </div>
+        <StatusChip Label="@Outage.Status" Variant="@StatusVariant" />
+    </div>
+    <div class="outage-card__body">
+        <div>
+            <span class="label">ETA</span>
+            <strong>@EtaText</strong>
+        </div>
+        <div>
+            <span class="label">Affected</span>
+            <strong>@Outage.AffectedCustomers</strong>
+        </div>
+        <div>
+            <span class="label">Cause</span>
+            <strong>@(Outage.Cause ?? "Investigating")</strong>
+        </div>
+    </div>
+</RadzenCard>
+
+@code {
+    [Parameter, EditorRequired] public OutageSummaryResponse Outage { get; set; } = default!;
+
+    private string EtaText => Outage.EstimatedRestoration?.ToLocalTime().ToString("t") ?? "TBD";
+
+    private string StatusVariant => Outage.Status switch
+    {
+        "Resolved" => "success",
+        "CrewDispatched" => "warning",
+        "Acknowledged" => "info",
+        _ => "default"
+    };
+}
