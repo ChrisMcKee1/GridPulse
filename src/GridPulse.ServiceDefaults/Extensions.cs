@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using GridPulse.ServiceDefaults.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,13 +56,16 @@ public static class Extensions
             logging.IncludeScopes = true;
         });
 
+        builder.Logging.AddTicketingLogFilters();
+
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddMeter("Microsoft.SemanticKernel*");
+                    .AddMeter("Microsoft.SemanticKernel*")
+                    .AddTicketingMeters();
             })
             .WithTracing(tracing =>
             {

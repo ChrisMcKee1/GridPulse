@@ -1,3 +1,4 @@
+using GridPulse.Infrastructure;
 using GridPulse.Web.Components;
 using GridPulse.Web.Services;
 using Microsoft.Extensions.Hosting;
@@ -6,6 +7,7 @@ using Radzen;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddMockUserContext(builder.Configuration);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()

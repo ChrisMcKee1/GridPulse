@@ -3,6 +3,7 @@ using GridPulse.Application;
 using GridPulse.Application.Services;
 using GridPulse.Infrastructure;
 using GridPulse.Infrastructure.Persistence;
+using GridPulse.ServiceDefaults.Observability;
 using GridPulse.WebApi.Extensions;
 using Microsoft.Extensions.Hosting;
 using Scalar.AspNetCore;
@@ -16,7 +17,10 @@ builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddInfrastructureServices(builder.Configuration)
+                .AddTicketingRepositories();
+builder.Services.AddTicketingHealthChecks(options =>
+    options.PostgresConnectionString = builder.Configuration.GetConnectionString("gridpulse-db"));
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddCors(options =>

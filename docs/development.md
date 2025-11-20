@@ -193,6 +193,32 @@ dotnet test GridPulse.sln --logger "console;verbosity=detailed"
 
 ---
 
+### Authentication Placeholder & Feature Flag
+
+Authentication is intentionally mocked until the Entra integration lands. Both `GridPulse.WebApi` and `GridPulse.Web` read a shared configuration block:
+
+```json
+"Authentication": {
+    "Provider": "Mock",
+    "Mock": {
+        "DisplayName": "Auto Operator",
+        "Roles": ["operator", "dispatcher"],
+        "Claims": {
+            "tenant": "default",
+            "scope": "ticketing"
+        }
+    }
+}
+```
+
+- `Provider` is a feature flag. It must remain `Mock` until Entra wiring replaces `MockUserContext`; any other value throws at startup so we do not accidentally ship without real auth.
+- Update the `Mock` payload to impersonate different personas (e.g., dispatcher-only) when demoing. Both hosts read the same settings so UI and API stay in sync.
+- **TODO**: replace `MockUserContext` with an Entra-backed provider and allow `Provider` to switch between `Mock` and `Entra` without touching endpoints or components.
+
+Document changes whenever you alter roles/claims so QA scripts and Playwright scenarios can adopt the new expectations.
+
+---
+
 ### Adding New Features
 
 #### Domain Entity

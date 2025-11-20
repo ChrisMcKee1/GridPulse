@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Bogus" Version="35.4.0" />
     <PackageReference Include="CsvHelper" Version="31.0.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
@@ -21,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\GridPulse.Domain\GridPulse.Domain.csproj" />
     <ProjectReference Include="..\GridPulse.Application\GridPulse.Application.csproj" />
+    <ProjectReference Include="..\GridPulse.ServiceDefaults\GridPulse.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>
