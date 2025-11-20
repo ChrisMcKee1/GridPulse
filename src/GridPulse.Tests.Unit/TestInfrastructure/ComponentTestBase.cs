@@ -3,6 +3,7 @@ using System.Net.Http;
 using Bunit;
 using GridPulse.Web.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Radzen;
 
 namespace GridPulse.Tests.Unit.TestInfrastructure;
 
@@ -19,6 +20,13 @@ public abstract class ComponentTestBase : TestContext
 
         Services.AddSingleton(httpClient);
         Services.AddScoped(sp => new GridPulseApiClient(sp.GetRequiredService<HttpClient>()));
+        Services.AddScoped<DialogService>();
+        Services.AddScoped<NotificationService>();
+        Services.AddScoped<TooltipService>();
+        Services.AddScoped<ContextMenuService>();
+        Services.AddScoped<ThemeService>();
+
+        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
     }
 
     protected void EnqueueHttpResponse(HttpResponseMessage response)

@@ -10,6 +10,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IOutageReadService, OutageReadService>();
         services.AddScoped<ITicketWriteService, TicketWriteService>();
+        services.AddScoped<ITicketQueryService, TicketQueryService>();
+        services.AddScoped<ITicketAutomationService, TicketAutomationService>();
         return services;
     }
 }

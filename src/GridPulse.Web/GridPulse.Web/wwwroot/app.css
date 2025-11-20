@@ -199,3 +199,150 @@ h1:focus {
     flex-direction: column;
     gap: 1.25rem;
 }
+
+.tickets-page {
+    padding-bottom: 2rem;
+}
+
+.tickets-subtitle {
+    color: #6b7280;
+    margin: 0;
+}
+
+.tickets-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+    .tickets-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tickets-filter label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.tickets-detail-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tickets-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.tickets-detail-subtitle {
+    margin: 0;
+    color: #6b7280;
+}
+
+.tickets-detail-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+}
+
+.tickets-detail-meta .label,
+.tickets-asset-list .label {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 0.15rem;
+}
+
+.tickets-asset-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.35rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tickets-asset-list li {
+    background-color: #f3f4f6;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+}
+
+.tickets-actions {
+    margin: 0.5rem 0 0.25rem;
+}
+
+.tickets-divider {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 1.5rem 0;
+}
+
+.ticket-timeline-card {
+    margin-top: 0.5rem;
+}
+
+.ticket-timeline-count {
+    font-weight: 600;
+    color: #374151;
+}
+
+.ticket-timeline-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.ticket-timeline-item {
+    border-left: 3px solid #e5e7eb;
+    padding-left: 1rem;
+}
+
+.ticket-timeline-item__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.ticket-timeline-item__actor {
+    font-weight: 600;
+}
+
+.ticket-timeline-item__details {
+    list-style: none;
+    padding: 0;
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.ticket-timeline-item.warning {
+    border-left-color: #fbbf24;
+}
+
+.ticket-timeline-item.success {
+    border-left-color: #34d399;
+}
+
+.ticket-timeline-item.info {
+    border-left-color: #60a5fa;
+}
+
+.ticket-timeline-item.danger {
+    border-left-color: #f87171;
+}

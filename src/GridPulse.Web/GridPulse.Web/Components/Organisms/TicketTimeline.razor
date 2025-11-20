@@ -1,11 +1,82 @@
 @using GridPulse.Application.Models
+@using GridPulse.Domain.Enums
+@using Radzen
 
-<div data-testid="ticket-timeline">
-    <!-- Timeline entries will render here -->
-</div>
+<RadzenCard class="ticket-timeline-card">
+    <RadzenStack Gap="12px">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+            <div>
+                <h4>Timeline</h4>
+                <p class="tickets-subtitle">Most recent events first</p>
+            </div>
+            <span class="ticket-timeline-count">@Events.Count</span>
+        </RadzenStack>
+
+        @if (Events.Count == 0)
+        {
+            <RadzenAlert Severity="Severity.Info" Text="No timeline entries yet." />
+        }
+        else
+        {
+            <ul class="ticket-timeline-list" data-testid="ticket-timeline">
+                @foreach (var item in OrderedEvents)
+                {
+                    var variant = GetVariant(item.EventType);
+                    <li class="ticket-timeline-item @variant">
+                        <div class="ticket-timeline-item__header">
+                            <StatusChip Label="@GetEventTitle(item)" Variant="@variant" />
+                            <span>@item.OccurredAt.ToLocalTime().ToString("g")</span>
+                        </div>
+                        <div class="ticket-timeline-item__body">
+                            <span class="ticket-timeline-item__actor">@item.Actor</span>
+                            @if (item.Details?.Count > 0)
+                            {
+                                <ul class="ticket-timeline-item__details">
+                                    @foreach (var detail in item.Details)
+                                    {
+                                        <li><strong>@detail.Key:</strong> @detail.Value</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </RadzenStack>
+</RadzenCard>
 
 @code
 {
     [Parameter]
     public IReadOnlyCollection<AssignmentEventDto> Events { get; set; } = Array.Empty<AssignmentEventDto>();
+
+    private IEnumerable<AssignmentEventDto> OrderedEvents => Events
+        .OrderByDescending(evt => evt.OccurredAt);
+
+    private static string GetEventTitle(AssignmentEventDto evt) => evt.EventType switch
+    {
+        AssignmentEventType.TicketDuplicateFlag => "Potential duplicate",
+        AssignmentEventType.TicketCreated => "Ticket created",
+        AssignmentEventType.TicketEdited => "Ticket updated",
+        AssignmentEventType.RecommendationGenerated => "Recommendation generated",
+        AssignmentEventType.AssignmentPublished => "Assignment published",
+        AssignmentEventType.CrewAcknowledged => "Crew acknowledged",
+        AssignmentEventType.CrewEnRoute => "Crew en route",
+        AssignmentEventType.CrewOnScene => "Crew on scene",
+        AssignmentEventType.CrewPaused => "Crew paused",
+        AssignmentEventType.CrewCompleted => "Crew completed",
+        AssignmentEventType.OperatorClosed => "Operator closed",
+        AssignmentEventType.TicketCancelled => "Ticket cancelled",
+        _ => evt.EventType.ToString()
+    };
+
+    private static string GetVariant(AssignmentEventType eventType) => eventType switch
+    {
+        AssignmentEventType.TicketDuplicateFlag => "warning",
+        AssignmentEventType.CrewCompleted or AssignmentEventType.OperatorClosed => "success",
+        AssignmentEventType.CrewAcknowledged or AssignmentEventType.CrewEnRoute or AssignmentEventType.CrewOnScene => "info",
+        AssignmentEventType.TicketCancelled => "danger",
+        _ => "default"
+    };
 }

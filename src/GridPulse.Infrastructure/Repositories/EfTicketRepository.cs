@@ -2,6 +2,7 @@ using GridPulse.Application.Abstractions;
 using GridPulse.Application.Models;
 using GridPulse.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace GridPulse.Infrastructure.Repositories;
 
@@ -13,6 +14,8 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
             .AsSplitQuery()
             .Include(t => t.Events)
             .Include(t => t.Recommendations)
+                .ThenInclude(r => r.Crew)
+                    .ThenInclude(c => c.LocationHistory)
             .FirstOrDefaultAsync(t => t.Id == ticketId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -28,7 +31,8 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
         var statuses = options.Statuses?.ToArray();
         if (statuses is { Length: > 0 })
         {
-            query = query.Where(ticket => statuses.Contains(ticket.Status));
+            var statusSet = statuses.ToHashSet();
+            query = query.Where(ticket => statusSet.Contains(ticket.Status));
         }
 
         if (options.MinPriority is { } minPriority)
@@ -41,7 +45,10 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
 
         if (includeRecommendations)
         {
-            query = query.Include(ticket => ticket.Recommendations);
+            query = query
+                .Include(ticket => ticket.Recommendations)
+                    .ThenInclude(recommendation => recommendation.Crew)
+                        .ThenInclude(crew => crew.LocationHistory);
         }
 
         if (includeTimeline)
@@ -92,6 +99,18 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
     {
         ArgumentNullException.ThrowIfNull(recommendations);
         await dbContext.DispatchRecommendations.AddRangeAsync(recommendations, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<bool> ExistsByOutageReferenceAsync(string outageReferenceId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(outageReferenceId))
+        {
+            throw new ArgumentException("Outage reference identifier is required.", nameof(outageReferenceId));
+        }
+
+        return dbContext.Tickets.AnyAsync(
+            ticket => ticket.OutageReferenceId == outageReferenceId,
+            cancellationToken);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

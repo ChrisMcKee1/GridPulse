@@ -55,12 +55,12 @@ description: "Task list for Ticket Management & Dispatch Optimization"
 
 ### Implementation – US1
 
-- [ ] T014 [P] [US1] Implement `TicketWriteService`, `TicketQueryService`, and `TicketAutomationService` logic under `src/GridPulse.Application/Services` using new abstractions + emitting `AssignmentEvent` history.
-- [ ] T015 [US1] Add `TicketAutomationWorker` hosted service in `src/GridPulse.WebApi/Workers/TicketAutomationWorker.cs` and wire it in `Program.cs` to subscribe to outage feed + publish metrics.
-- [ ] T016 [US1] Build `/api/tickets` Minimal API group in `src/GridPulse.WebApi/Endpoints/TicketsEndpointGroup.cs` (POST list, GET list w/ filters, PATCH status) returning ProblemDetails on validation errors.
-- [ ] T017 [P] [US1] Extend `GridPulseApiClient` and DTO mappers in `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs` so operator UI only hits typed endpoints.
-- [ ] T018 [US1] Implement Radzen-based operator UI (`Tickets.razor`, `TicketTimeline.razor`) with loading/error states, duplicate ticket warnings, and hydration-safe state handling.
-- [ ] T019 [US1] Add ticket automation seed + duplicate alert logic in `src/GridPulse.Infrastructure/SeedData/TicketSeed.cs` and ensure EF migration seeds baseline data for QA.
+- [x] T014 [P] [US1] Implement `TicketWriteService`, `TicketQueryService`, and `TicketAutomationService` logic under `src/GridPulse.Application/Services` using new abstractions + emitting `AssignmentEvent` history.
+- [x] T015 [US1] Add `TicketAutomationWorker` hosted service in `src/GridPulse.WebApi/Workers/TicketAutomationWorker.cs` and wire it in `Program.cs` to subscribe to outage feed + publish metrics.
+- [x] T016 [US1] Build `/api/tickets` Minimal API group in `src/GridPulse.WebApi/Endpoints/TicketsEndpointGroup.cs` (POST list, GET list w/ filters, PATCH status) returning ProblemDetails on validation errors.
+- [x] T017 [P] [US1] Extend `GridPulseApiClient` and DTO mappers in `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs` so operator UI only hits typed endpoints.
+- [x] T018 [US1] Implement Radzen-based operator UI (`Tickets.razor`, `TicketTimeline.razor`) with loading/error states, duplicate ticket warnings, and hydration-safe state handling.
+- [x] T019 [US1] Add ticket automation seed + duplicate alert logic in `src/GridPulse.Infrastructure/SeedData/TicketSeed.cs` and ensure EF migration seeds baseline data for QA.
 
 **Checkpoint**: MVP ready—operators can manage tickets independently.
 

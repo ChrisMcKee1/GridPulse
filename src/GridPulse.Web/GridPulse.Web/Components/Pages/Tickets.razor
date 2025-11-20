@@ -1,15 +1,452 @@
 @page "/tickets"
+@using System.Collections.Generic
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+@using GridPulse.Application.Models
+@using GridPulse.Domain.Enums
+@using GridPulse.Web.Services
+@using Radzen
+@inject GridPulseApiClient ApiClient
+@inject NotificationService NotificationService
+@implements IDisposable
 
-<h1 data-testid="tickets-heading">Tickets</h1>
+<RadzenStack Gap="16px" class="tickets-page">
+	<RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+		<div>
+			<h1 data-testid="tickets-heading">Tickets</h1>
+			<p class="tickets-subtitle">Monitor outage tickets, review duplicates, and advance workflow states.</p>
+		</div>
 
-<div data-testid="tickets-grid">
-	<!-- Ticket grid placeholder -->
-</div>
+		<RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
+			<RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="async () => await LoadTicketsAsync()" Disabled="@isLoading">Refresh</RadzenButton>
+			<RadzenButton Icon="add_circle" ButtonStyle="ButtonStyle.Primary" Click="ToggleCreatePanel">@("New Ticket")</RadzenButton>
+		</RadzenStack>
+	</RadzenStack>
 
-<button data-testid="tickets-promote-action" class="rz-button rz-state-disabled" disabled>
-	Promote Ticket
-</button>
+	@if (!string.IsNullOrEmpty(errorMessage))
+	{
+		<RadzenAlert AlertStyle="@(AlertStyle.Danger)" Closeable="true" Text="@errorMessage" />
+	}
+
+	<RadzenCard class="tickets-filters-card">
+		<RadzenStack Orientation="Orientation.Horizontal" Gap="12px" Wrap="FlexWrap.Wrap" AlignItems="AlignItems.End">
+			<div class="tickets-filter">
+				<label>Status</label>
+				<RadzenDropDown Data="@statusOptions" TItem="DropdownOption<TicketStatus>" TValue="IEnumerable<TicketStatus>" ValueProperty="Value" TextProperty="Label"
+							 Multiple="true" AllowClear="true" Style="min-width: 220px"
+							 @bind-Value="StatusFilter" Change="async _ => await ApplyFiltersAsync()" />
+			</div>
+			<div class="tickets-filter">
+				<label>Minimum priority</label>
+				<RadzenDropDown Data="@priorityOptions" TItem="DropdownOption<TicketPriority>" TValue="TicketPriority?" ValueProperty="Value" TextProperty="Label"
+								AllowClear="true" Placeholder="Any" Style="min-width: 160px"
+								@bind-Value="minPriority" Change="async _ => await ApplyFiltersAsync()" />
+			</div>
+			<div class="tickets-filter">
+				<label>Include timeline</label>
+				<RadzenSwitch @bind-Value="includeTimeline" Change="async _ => await ApplyFiltersAsync()" />
+			</div>
+			<div class="tickets-filter">
+				<label>Include recommendations</label>
+				<RadzenSwitch @bind-Value="includeRecommendations" Change="async _ => await ApplyFiltersAsync()" />
+			</div>
+		</RadzenStack>
+
+		@if (isCreatePanelOpen)
+		{
+			<hr class="tickets-divider" />
+			<RadzenTemplateForm TItem="TicketCreateFormModel" Data="@createModel" Submit="CreateTicketAsync">
+				<RadzenStack Gap="12px" class="tickets-create-form">
+					<RadzenAlert AlertStyle="@(AlertStyle.Info)" Text="New tickets will automatically run duplicate detection against existing outages." />
+					<ValidationSummary />
+					<div class="form-grid">
+						<RadzenTextBox @bind-Value="createModel.Title" Name="Title" Placeholder="Ticket title" Style="width:100%" />
+						<RadzenTextBox @bind-Value="createModel.OutageReferenceId" Name="OutageReferenceId" Placeholder="Outage reference" Style="width:100%" />
+						<RadzenDropDown Data="@priorityOptions" TItem="DropdownOption<TicketPriority>" TValue="TicketPriority" ValueProperty="Value" TextProperty="Label"
+										Style="width:100%" @bind-Value="createModel.Priority" />
+						<RadzenNumeric TValue="int" @bind-Value="createModel.CustomerImpact" Min="0" Style="width:100%" Placeholder="Impacted customers" />
+					</div>
+					<RadzenTextArea @bind-Value="createModel.Description" Rows="3" Placeholder="Notes for dispatchers" Style="width:100%" />
+					<RadzenTextBox @bind-Value="createModel.AssetsInput" Placeholder="Affected assets (comma separated)" Style="width:100%" />
+					<RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
+						<RadzenButton ButtonType="ButtonType.Submit" Icon="check" Disabled="@isSavingTicket">@(isSavingTicket ? "Creating..." : "Create ticket")</RadzenButton>
+						<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CancelCreatePanel" Disabled="@isSavingTicket">Cancel</RadzenButton>
+					</RadzenStack>
+				</RadzenStack>
+			</RadzenTemplateForm>
+		}
+	</RadzenCard>
+
+	<div class="tickets-layout">
+		<RadzenCard class="tickets-grid-card">
+			<div data-testid="tickets-grid">
+				@if (isLoading)
+				{
+					<RadzenSkeleton Lines="8" />
+				}
+				else if (tickets.Count == 0)
+				{
+					<p>No tickets match the selected filters.</p>
+				}
+				else
+				{
+					<RadzenDataGrid TItem="TicketDto" Data="tickets" AllowSorting="true" AllowPaging="true" PageSize="10" RowSelect="OnTicketSelected">
+						<Columns>
+							<RadzenDataGridColumn TItem="TicketDto" Property="Title" Title="Title" />
+							<RadzenDataGridColumn TItem="TicketDto" Title="Status">
+								<Template Context="item">
+									<StatusChip Label="@item.Status.ToString()" Variant="@GetStatusVariant(item.Status)" />
+								</Template>
+							</RadzenDataGridColumn>
+							<RadzenDataGridColumn TItem="TicketDto" Property="Priority" Title="Priority" />
+							<RadzenDataGridColumn TItem="TicketDto" Title="Customers">
+								<Template Context="item">@item.CustomerImpact</Template>
+							</RadzenDataGridColumn>
+							<RadzenDataGridColumn TItem="TicketDto" Title="Updated">
+								<Template Context="item">@item.UpdatedAt.ToLocalTime().ToString("g")</Template>
+							</RadzenDataGridColumn>
+						</Columns>
+					</RadzenDataGrid>
+				}
+			</div>
+		</RadzenCard>
+
+		<RadzenCard class="tickets-detail-card">
+			@if (selectedTicket is null)
+			{
+				<p>Select a ticket to inspect details and the activity timeline.</p>
+			}
+			else
+			{
+				<div class="tickets-detail-header">
+					<h3>@selectedTicket.Title</h3>
+					<div data-testid="ticket-status-value">
+						<StatusChip Label="@selectedTicket.Status.ToString()" Variant="@GetStatusVariant(selectedTicket.Status)" />
+					</div>
+				</div>
+				<p class="tickets-detail-subtitle">Outage reference @selectedTicket.OutageReferenceId</p>
+
+				@if (ShowDuplicateWarning(selectedTicket))
+				{
+					<div data-testid="duplicate-alert">
+						<RadzenAlert AlertStyle="@(AlertStyle.Warning)" Text="Possible duplicate outage detected within the last 5 minutes." />
+					</div>
+				}
+
+				<div class="tickets-detail-meta">
+					<div>
+						<span class="label">Priority</span>
+						<strong>@selectedTicket.Priority</strong>
+					</div>
+					<div>
+						<span class="label">Customers</span>
+						<strong>@selectedTicket.CustomerImpact</strong>
+					</div>
+					<div>
+						<span class="label">Assigned crew</span>
+						<strong>@(string.IsNullOrWhiteSpace(selectedTicket.AssignedCrewName) ? "Unassigned" : selectedTicket.AssignedCrewName)</strong>
+					</div>
+					<div>
+						<span class="label">Updated</span>
+						<strong>@selectedTicket.UpdatedAt.ToLocalTime().ToString("g")</strong>
+					</div>
+				</div>
+
+				@if (selectedTicket.AffectedAssets.Count > 0)
+				{
+					<div class="tickets-asset-list">
+						<span class="label">Assets</span>
+						<ul>
+							@foreach (var asset in selectedTicket.AffectedAssets)
+							{
+								<li>@asset</li>
+							}
+						</ul>
+					</div>
+				}
+
+				<RadzenStack Orientation="Orientation.Horizontal" Gap="8px" class="tickets-actions">
+					<RadzenButton Icon="bolt" data-testid="tickets-promote-action"
+								  Disabled="@(!CanPromoteSelectedTicket || isUpdatingStatus)"
+								  Click="PromoteTicketAsync">
+						@(isUpdatingStatus ? "Updating..." : GetPromoteLabel())
+					</RadzenButton>
+					<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="undo" Disabled="@isUpdatingStatus" Click="ResetSelection">Reset selection</RadzenButton>
+				</RadzenStack>
+
+				<TicketTimeline Events="selectedTicket.Events" />
+			}
+		</RadzenCard>
+	</div>
+</RadzenStack>
 
 @code
 {
+	private readonly IReadOnlyList<DropdownOption<TicketStatus>> statusOptions = Enum.GetValues<TicketStatus>()
+		.Select(value => new DropdownOption<TicketStatus>(value.ToString(), value))
+		.ToArray();
+
+	private readonly IReadOnlyList<DropdownOption<TicketPriority>> priorityOptions = Enum.GetValues<TicketPriority>()
+		.Select(value => new DropdownOption<TicketPriority>(value.ToString(), value))
+		.ToArray();
+
+	private IEnumerable<TicketStatus> StatusFilter { get; set; } = new List<TicketStatus> { TicketStatus.Open, TicketStatus.InProgress };
+	private TicketPriority? minPriority;
+	private bool includeTimeline = true;
+	private bool includeRecommendations;
+	private IReadOnlyList<TicketDto> tickets = Array.Empty<TicketDto>();
+	private TicketDto? selectedTicket;
+	private bool isLoading = true;
+	private bool isUpdatingStatus;
+	private bool isCreatePanelOpen;
+	private bool isSavingTicket;
+	private string? errorMessage;
+	private TicketCreateFormModel createModel = TicketCreateFormModel.CreateDefault();
+	private CancellationTokenSource? loadCts;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadTicketsAsync();
+	}
+
+	public void Dispose()
+	{
+		loadCts?.Cancel();
+		loadCts?.Dispose();
+	}
+
+	private async Task LoadTicketsAsync(Guid? preferredSelectionId = null)
+	{
+		loadCts?.Cancel();
+		loadCts?.Dispose();
+		loadCts = new CancellationTokenSource();
+
+		isLoading = true;
+		errorMessage = null;
+
+		var filter = new TicketFilter
+		{
+			Statuses = StatusFilter.Any() ? StatusFilter.ToArray() : null,
+			MinPriority = minPriority,
+			IncludeRecommendations = includeRecommendations,
+			IncludeTimeline = includeTimeline
+		};
+
+		try
+		{
+			var result = await ApiClient.GetTicketsAsync(filter, loadCts.Token).ConfigureAwait(false);
+			tickets = result.Items
+				.OrderByDescending(ticket => ticket.UpdatedAt)
+				.ToArray();
+
+			var desiredId = preferredSelectionId ?? selectedTicket?.Id;
+			selectedTicket = desiredId is null
+				? tickets.FirstOrDefault()
+				: tickets.FirstOrDefault(ticket => ticket.Id == desiredId) ?? tickets.FirstOrDefault();
+		}
+		catch (OperationCanceledException)
+		{
+			// swallow cancellation triggered by filter changes
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Unable to load tickets: {ex.Message}";
+		}
+		finally
+		{
+			isLoading = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task ApplyFiltersAsync()
+	{
+		await LoadTicketsAsync();
+	}
+
+	private void OnTicketSelected(TicketDto ticket)
+	{
+		selectedTicket = ticket;
+	}
+
+	private void ToggleCreatePanel()
+	{
+		isCreatePanelOpen = !isCreatePanelOpen;
+		if (isCreatePanelOpen)
+		{
+			createModel = TicketCreateFormModel.CreateDefault();
+		}
+	}
+
+	private void CancelCreatePanel()
+	{
+		isCreatePanelOpen = false;
+		createModel = TicketCreateFormModel.CreateDefault();
+	}
+
+	private async Task CreateTicketAsync()
+	{
+		if (isSavingTicket)
+		{
+			return;
+		}
+
+		isSavingTicket = true;
+
+		try
+		{
+			var request = new TicketCreateRequest
+			{
+				Title = createModel.Title,
+				OutageReferenceId = createModel.OutageReferenceId,
+				Description = createModel.Description,
+				Priority = createModel.Priority,
+				CustomerImpact = createModel.CustomerImpact,
+				AffectedAssets = ParseAssets(createModel.AssetsInput)
+			};
+
+			var created = await ApiClient.CreateTicketAsync(request).ConfigureAwait(false);
+			await LoadTicketsAsync(created.Id);
+			NotificationService.Notify(Radzen.NotificationSeverity.Success, "Ticket created", $"{created.Title} is now in {created.Status} state.");
+			isCreatePanelOpen = false;
+			createModel = TicketCreateFormModel.CreateDefault();
+		}
+		catch (Exception ex)
+		{
+			NotificationService.Notify(Radzen.NotificationSeverity.Error, "Failed to create ticket", ex.Message);
+		}
+		finally
+		{
+			isSavingTicket = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task PromoteTicketAsync()
+	{
+		if (selectedTicket is null)
+		{
+			return;
+		}
+
+		var nextStatus = GetNextStatus(selectedTicket.Status);
+		if (nextStatus is null)
+		{
+			return;
+		}
+
+		isUpdatingStatus = true;
+
+		try
+		{
+			var request = new TicketStatusUpdateRequest
+			{
+				Status = nextStatus.Value
+			};
+
+			var updated = await ApiClient.UpdateTicketStatusAsync(selectedTicket.Id, request).ConfigureAwait(false);
+			UpsertTicket(updated);
+			selectedTicket = updated;
+			NotificationService.Notify(Radzen.NotificationSeverity.Success, "Ticket updated", $"Status moved to {updated.Status}.");
+		}
+		catch (Exception ex)
+		{
+			NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unable to update ticket", ex.Message);
+		}
+		finally
+		{
+			isUpdatingStatus = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void UpsertTicket(TicketDto updated)
+	{
+		var mutable = tickets.ToList();
+		var index = mutable.FindIndex(ticket => ticket.Id == updated.Id);
+		if (index >= 0)
+		{
+			mutable[index] = updated;
+		}
+		else
+		{
+			mutable.Insert(0, updated);
+		}
+
+		tickets = mutable;
+	}
+
+	private static List<string> ParseAssets(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return new List<string>();
+		}
+
+		return value
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.Take(20)
+			.ToList();
+	}
+
+	private void ResetSelection()
+	{
+		selectedTicket = tickets.FirstOrDefault();
+	}
+
+	private bool ShowDuplicateWarning(TicketDto ticket) => ticket.Events.Any(evt => evt.EventType == AssignmentEventType.TicketDuplicateFlag);
+
+	private bool CanPromoteSelectedTicket => selectedTicket is not null && GetNextStatus(selectedTicket.Status) is not null;
+
+	private static TicketStatus? GetNextStatus(TicketStatus status) => status switch
+	{
+		TicketStatus.Open => TicketStatus.InProgress,
+		TicketStatus.InProgress => TicketStatus.Resolved,
+		TicketStatus.Resolved => TicketStatus.Closed,
+		_ => null
+	};
+
+	private string GetPromoteLabel()
+	{
+		if (selectedTicket is null)
+		{
+			return "Promote";
+		}
+
+		var next = GetNextStatus(selectedTicket.Status);
+		return next is null ? "No further action" : $"Move to {next}";
+	}
+
+	private static string GetStatusVariant(TicketStatus status) => status switch
+	{
+		TicketStatus.Open => "info",
+		TicketStatus.InProgress => "warning",
+		TicketStatus.Resolved => "success",
+		TicketStatus.Closed => "success",
+		TicketStatus.Cancelled => "danger",
+		_ => "default"
+	};
+
+	private sealed record DropdownOption<TValue>(string Label, TValue Value);
+
+	private sealed class TicketCreateFormModel
+	{
+		[Required]
+		[StringLength(140, ErrorMessage = "Title must be 140 characters or fewer.")]
+		public string Title { get; set; } = string.Empty;
+
+		[Required]
+		public string OutageReferenceId { get; set; } = string.Empty;
+
+		public string? Description { get; set; }
+		public TicketPriority Priority { get; set; } = TicketPriority.Medium;
+
+		[Range(0, 100000, ErrorMessage = "Customer impact must be non-negative.")]
+		public int CustomerImpact { get; set; }
+
+		public string AssetsInput { get; set; } = string.Empty;
+
+		public static TicketCreateFormModel CreateDefault() => new();
+	}
 }

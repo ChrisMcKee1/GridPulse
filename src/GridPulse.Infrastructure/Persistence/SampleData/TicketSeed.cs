@@ -1,4 +1,6 @@
 using Bogus;
+using GridPulse.Application.Abstractions;
+using GridPulse.Application.Models;
 using GridPulse.Domain.Entities;
 using GridPulse.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +11,18 @@ using System.Linq;
 
 namespace GridPulse.Infrastructure.Persistence.SampleData;
 
-internal sealed class TicketSeed(GridPulseDbContext dbContext, IOptions<TicketSeedOptions> options, ILogger<TicketSeed> logger)
+internal sealed class TicketSeed(
+    GridPulseDbContext dbContext,
+    IOptions<TicketSeedOptions> options,
+    ILogger<TicketSeed> logger,
+    ITicketAutomationService automationService,
+    TimeProvider? timeProvider = null)
     : IDataSeeder
 {
     private readonly TicketSeedOptions _options = options.Value;
     private readonly ILogger<TicketSeed> _logger = logger;
+    private readonly ITicketAutomationService _automationService = automationService;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public async Task SeedAsync(CancellationToken cancellationToken)
     {
@@ -50,11 +59,95 @@ internal sealed class TicketSeed(GridPulseDbContext dbContext, IOptions<TicketSe
         await dbContext.AssignmentEvents.AddRangeAsync(events, cancellationToken).ConfigureAwait(false);
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        var (automationCreated, automationSuppressed) = await SeedAutomationTicketsAsync(cancellationToken).ConfigureAwait(false);
+
         _logger.LogInformation(
-                "Seeded {TicketCount} tickets, {CrewCount} crews, and {SnapshotCount} telemetry snapshots for ticketing demo.",
+            "Seeded {TicketCount} synthetic tickets, {AutomationCount} automation tickets (suppressed {DuplicateSuppressions}), {CrewCount} crews, and {SnapshotCount} telemetry snapshots for ticketing demo.",
             tickets.Count,
-                crews.Count,
-                snapshots.Count);
+            automationCreated,
+            automationSuppressed,
+            crews.Count,
+            snapshots.Count);
+    }
+
+    private async Task<(int Created, int Suppressed)> SeedAutomationTicketsAsync(CancellationToken cancellationToken)
+    {
+        var seeds = CreateAutomationSeeds(_timeProvider.GetUtcNow());
+        var created = 0;
+        var suppressed = 0;
+
+        foreach (var payload in seeds)
+        {
+            var result = await _automationService
+                .CreateOrUpdateAutomatedTicketAsync(payload, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result is not null)
+            {
+                created++;
+            }
+            else
+            {
+                suppressed++;
+            }
+        }
+
+        return (created, suppressed);
+    }
+
+    private static IReadOnlyList<TicketSeedData> CreateAutomationSeeds(DateTimeOffset referenceTime)
+    {
+        static TicketSeedData Build(
+            string outageReference,
+            string title,
+            TicketPriority priority,
+            string description,
+            string[] assets,
+            int customerImpact,
+            DateTimeOffset openedAt) => new(
+                outageReference,
+                title,
+                priority,
+                description,
+                assets,
+                customerImpact,
+                openedAt);
+
+        return new[]
+        {
+            Build(
+                "AUTO-FDR-041",
+                "Feeder 41 lockout near West Ridge",
+                TicketPriority.High,
+                "Breaker lockout triggered from SCADA sensors in the West Ridge industrial corridor.",
+                new[] { "FDR-41A" },
+                940,
+                referenceTime.AddMinutes(-6)),
+            Build(
+                "AUTO-FDR-041-DUP",
+                "Telemetry repeat for West Ridge",
+                TicketPriority.Medium,
+                "Downstream sensors reported the same feeder fault a few minutes later.",
+                new[] { "FDR-41A" },
+                380,
+                referenceTime.AddMinutes(-4)),
+            Build(
+                "AUTO-TX-930",
+                "Transformer alarm near Lakewood",
+                TicketPriority.Critical,
+                "Oil pressure dropped below safe thresholds at transformer TX-930.",
+                new[] { "TX-LKW-930" },
+                1280,
+                referenceTime.AddMinutes(-18)),
+            Build(
+                "AUTO-FDR-230",
+                "Midtown double feeder outage",
+                TicketPriority.High,
+                "Voltage sag detected on parallel feeders 230A and 230B heading into Midtown.",
+                new[] { "FDR-230A", "FDR-230B" },
+                760,
+                referenceTime.AddMinutes(-24))
+        };
     }
 
     private static Faker<Crew> CreateCrewFaker()

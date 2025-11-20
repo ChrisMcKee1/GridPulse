@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluentAssertions;
 using GridPulse.Application.Models;
 using GridPulse.Domain.Entities;
@@ -13,6 +15,7 @@ namespace GridPulse.Tests.Unit.WebApi;
 [Collection(TestCollections.Api)]
 public sealed class TicketEndpointTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
     private readonly GridPulseApiFactory _factory;
     private readonly HttpClient _client;
 
@@ -37,7 +40,7 @@ public sealed class TicketEndpointTests
         var response = await _client.PostAsJsonAsync("/api/tickets", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadFromJsonAsync<TicketDto>();
+        var body = await response.Content.ReadFromJsonAsync<TicketDto>(JsonOptions);
         body.Should().NotBeNull();
         body!.Title.Should().Be(request.Title);
         body.Status.Should().Be(TicketStatus.Open);
@@ -84,7 +87,7 @@ public sealed class TicketEndpointTests
         var response = await _client.GetAsync("/api/tickets?statuses=Open");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<PagedResult<TicketDto>>();
+        var result = await response.Content.ReadFromJsonAsync<PagedResult<TicketDto>>(JsonOptions);
         result.Should().NotBeNull();
         result!.Items.Should().HaveCount(1);
         result.Items.Single().Status.Should().Be(TicketStatus.Open);
@@ -119,7 +122,7 @@ public sealed class TicketEndpointTests
         var response = await _client.PatchAsJsonAsync($"/api/tickets/{ticketId}/status", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
         problem.Should().NotBeNull();
         problem!.Status.Should().Be((int)HttpStatusCode.Conflict);
         problem.Detail.Should().Contain("Cannot transition ticket");
@@ -132,5 +135,12 @@ public sealed class TicketEndpointTests
             dbContext.Tickets.Add(ticket);
             await dbContext.SaveChangesAsync();
         });
+    }
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
     }
 }

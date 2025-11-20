@@ -4,14 +4,29 @@ using GridPulse.Application.Services;
 using GridPulse.Infrastructure;
 using GridPulse.Infrastructure.Persistence;
 using GridPulse.ServiceDefaults.Observability;
+using GridPulse.WebApi.Endpoints;
 using GridPulse.WebApi.Extensions;
+using GridPulse.WebApi.Workers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.AddNpgsqlDbContext<GridPulseDbContext>("gridpulse-db");
+
+var isTesting = builder.Environment.IsEnvironment("Testing");
+
+if (isTesting)
+{
+    builder.Services.AddDbContext<GridPulseDbContext>(options =>
+        options.UseInMemoryDatabase("GridPulseTesting"));
+}
+else
+{
+    builder.AddNpgsqlDbContext<GridPulseDbContext>("gridpulse-db");
+}
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
@@ -20,7 +35,12 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration)
                 .AddTicketingRepositories();
 builder.Services.AddTicketingHealthChecks(options =>
-    options.PostgresConnectionString = builder.Configuration.GetConnectionString("gridpulse-db"));
+{
+    if (!isTesting)
+    {
+        options.PostgresConnectionString = builder.Configuration.GetConnectionString("gridpulse-db");
+    }
+});
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddCors(options =>
@@ -30,6 +50,13 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
+
+builder.Services.AddOptions<TicketAutomationWorkerOptions>()
+    .Bind(builder.Configuration.GetSection(TicketAutomationWorkerOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddHostedService<TicketAutomationWorker>();
 
 var app = builder.Build();
 
@@ -69,6 +96,8 @@ outagesGroup.MapGet(
         return outage is null ? Results.NotFound() : Results.Ok(outage);
     })
     .WithName("GetOutageById");
+
+app.MapTicketsEndpoints();
 
 await app.Services.InitializeDatabaseAsync();
 
