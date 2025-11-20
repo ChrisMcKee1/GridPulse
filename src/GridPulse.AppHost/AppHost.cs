@@ -1,7 +1,8 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("gridpulse-postgres")
-    .WithDataVolume();
+    .WithDataVolume()
+    .WithPgAdmin();
 
 var outageDb = postgres.AddDatabase("gridpulse-db");
 
