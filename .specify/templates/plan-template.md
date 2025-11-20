@@ -31,7 +31,10 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- **Gate 1 – Clean Architecture Boundaries**: List every new dependency and confirm it honors Domain → Application → Infrastructure → Host flow. Call out any required RFCs.
+- **Gate 2 – ServiceDefaults & Observability**: Describe how the feature uses `GridPulse.ServiceDefaults` (telemetry, health, HttpClient resilience) and note any additions to that project.
+- **Gate 3 – API + Typed Client Contracts**: Enumerate API endpoints, DTOs, and typed client updates needed so UI slices stay isolated from infrastructure.
+- **Gate 4 – Testing & Data Readiness**: Identify which unit/integration tests will be authored and how repositories/data stores are provisioned (EF migrations, Aspire resources, etc.).
 
 ## Project Structure
 

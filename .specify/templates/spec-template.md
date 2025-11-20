@@ -75,6 +75,12 @@
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
+### Constitution Alignment Checklist
+
+- Map each user story to its API endpoints, DTOs, and typed client updates so contracts remain API-first.
+- Call out any changes needed in `GridPulse.ServiceDefaults` (telemetry, health, HttpClient policies) plus testing implications.
+- Highlight data-layer or repository impacts to prove Domain → Application → Infrastructure boundaries stay intact.
+
 ## Requirements *(mandatory)*
 
 <!--

@@ -12,6 +12,8 @@ description: "Task list template for feature implementation"
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**Constitution Alignment**: For every story include tasks that (a) preserve Clean Architecture boundaries, (b) update typed API clients and contracts, (c) add telemetry/tests per ServiceDefaults guidance, and (d) document data/repository changes.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -156,6 +158,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
+- [ ] TXXX ServiceDefaults telemetry/resilience updates (e.g., new meters, health checks, HttpClient policies)
+- [ ] TXXX Verify typed API client coverage (GridPulseApiClient plus UI bindings)
 
 ---
 

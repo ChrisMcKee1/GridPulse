@@ -1,0 +1,348 @@
+openapi: 3.0.3
+info:
+  title: GridPulse Ticketing & Dispatch API (incremental)
+  version: 0.1.0-draft
+  description: >-
+    Minimal API additions for ticket management, dispatch optimization, and crew status
+    acknowledgements. Contracts comply with `API/constitution.md` and will be promoted
+    into the Scalar-served document alongside existing endpoints.
+servers:
+  - url: https://localhost:7143
+    description: Aspire local AppHost default
+paths:
+  /api/tickets:
+    post:
+      summary: Create a new ticket (auto or manual)
+      tags: [Tickets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketCreateRequest'
+      responses:
+        '201':
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '400':
+          description: Validation failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+    get:
+      summary: List tickets with filters for operators/dispatchers
+      tags: [Tickets]
+      parameters:
+        - in: query
+          name: statuses
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TicketStatus'
+          style: form
+          explode: false
+        - in: query
+          name: minPriority
+          schema:
+            $ref: '#/components/schemas/TicketPriority'
+        - in: query
+          name: includeRecommendations
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TicketResponse'
+  /api/tickets/{ticketId}/status:
+    patch:
+      summary: Update ticket status with workflow enforcement
+      tags: [Tickets]
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketStatusUpdateRequest'
+      responses:
+        '200':
+          description: Updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '409':
+          description: Workflow violation
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/dispatch/recommendations:
+    get:
+      summary: Retrieve ranked crew recommendations for a ticket
+      tags: [Dispatch]
+      parameters:
+        - in: query
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ranked recommendations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    $ref: '#/components/schemas/TicketSummary'
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DispatchRecommendationDto'
+  /api/dispatch/assignments:
+    post:
+      summary: Publish dispatcher decision and notify crew
+      tags: [Dispatch]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchAssignmentRequest'
+      responses:
+        '202':
+          description: Assignment accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentReceipt'
+  /api/crews/{crewId}/status:
+    post:
+      summary: Crew acknowledgement/status update hook (placeholder for mobile app)
+      tags: [Crew]
+      parameters:
+        - in: path
+          name: crewId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrewStatusUpdateRequest'
+      responses:
+        '202':
+          description: Status accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrewStatusUpdateResponse'
+components:
+  schemas:
+    TicketCreateRequest:
+      type: object
+      required: [title, outageReferenceId, priority]
+      properties:
+        title:
+          type: string
+          maxLength: 140
+        description:
+          type: string
+        outageReferenceId:
+          type: string
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        affectedAssets:
+          type: array
+          items:
+            type: string
+        customerImpact:
+          type: integer
+          minimum: 0
+    TicketStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        reason:
+          type: string
+          description: Required when cancelling or closing without crew input.
+    TicketResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        openedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        assignedCrew:
+          $ref: '#/components/schemas/CrewSummary'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchRecommendationDto'
+    TicketSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+    DispatchRecommendationDto:
+      type: object
+      properties:
+        crew:
+          $ref: '#/components/schemas/CrewSummary'
+        compositeScore:
+          type: number
+          format: double
+        scoreComponents:
+          type: object
+          additionalProperties:
+            type: number
+        etaMinutes:
+          type: integer
+        isAutoSelected:
+          type: boolean
+        isOverride:
+          type: boolean
+        overrideReason:
+          type: string
+    DispatchAssignmentRequest:
+      type: object
+      required: [ticketId, crewId]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        crewId:
+          type: string
+          format: uuid
+        overrideReason:
+          type: string
+        notifyCrewChannels:
+          type: array
+          items:
+            type: string
+            enum: [push, sms, voice]
+    AssignmentReceipt:
+      type: object
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        crewId:
+          type: string
+          format: uuid
+        deliveryStatus:
+          type: string
+          enum: [queued, delivered, failed]
+        trackingId:
+          type: string
+    CrewStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [acknowledged, en_route, on_scene, paused, completed]
+        note:
+          type: string
+        location:
+          $ref: '#/components/schemas/LocationPayload'
+    CrewStatusUpdateResponse:
+      type: object
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        acceptedAt:
+          type: string
+          format: date-time
+    CrewSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        currentStatus:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrewSkill'
+    LocationPayload:
+      type: object
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        capturedAt:
+          type: string
+          format: date-time
+    TicketStatus:
+      type: string
+      enum: [Open, InProgress, Resolved, Closed, Cancelled]
+    TicketPriority:
+      type: string
+      enum: [Critical, High, Medium, Low]
+    CrewSkill:
+      type: string
+      enum: [HighVoltage, Underground, Distribution, Fiber, Transformer]
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
