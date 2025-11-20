@@ -73,3 +73,5 @@ outagesGroup.MapGet(
 await app.Services.InitializeDatabaseAsync();
 
 app.Run();
+
+public partial class Program;

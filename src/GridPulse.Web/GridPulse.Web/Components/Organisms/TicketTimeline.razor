@@ -1,0 +1,11 @@
+@using GridPulse.Application.Models
+
+<div data-testid="ticket-timeline">
+    <!-- Timeline entries will render here -->
+</div>
+
+@code
+{
+    [Parameter]
+    public IReadOnlyCollection<AssignmentEventDto> Events { get; set; } = Array.Empty<AssignmentEventDto>();
+}

@@ -49,9 +49,9 @@ description: "Task list for Ticket Management & Dispatch Optimization"
 
 ### Tests – US1 (write before implementation)
 
-- [ ] T011 [P] [US1] Add unit tests covering `TicketWriteService` workflow transitions and duplicate-detection logic in `src/GridPulse.Tests.Unit/Application/TicketWriteServiceTests.cs`.
-- [ ] T012 [P] [US1] Add API contract/integration tests for `/api/tickets` create/list/status endpoints using `WebApplicationFactory` in `src/GridPulse.Tests.Unit/WebApi/TicketEndpointTests.cs`.
-- [ ] T013 [P] [US1] Add bUnit tests for `src/GridPulse.Web/Components/Pages/Tickets.razor` + `Components/Organisms/TicketTimeline.razor` covering grid filtering and promotion flow.
+- [x] T011 [P] [US1] Add unit tests covering `TicketWriteService` workflow transitions and duplicate-detection logic in `src/GridPulse.Tests.Unit/Application/TicketWriteServiceTests.cs`.
+- [x] T012 [P] [US1] Add API contract/integration tests for `/api/tickets` create/list/status endpoints using `WebApplicationFactory` in `src/GridPulse.Tests.Unit/WebApi/TicketEndpointTests.cs`.
+- [x] T013 [P] [US1] Add bUnit tests for `src/GridPulse.Web/Components/Pages/Tickets.razor` + `Components/Organisms/TicketTimeline.razor` covering grid filtering and promotion flow.
 
 ### Implementation – US1
 

@@ -8,14 +8,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="bunit" Version="1.29.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GridPulse.Application\GridPulse.Application.csproj" />
+    <ProjectReference Include="..\GridPulse.Domain\GridPulse.Domain.csproj" />
+    <ProjectReference Include="..\GridPulse.WebApi\GridPulse.WebApi.csproj" Aliases="global,GridPulseWebApi" />
+    <ProjectReference Include="..\GridPulse.Web\GridPulse.Web\GridPulse.Web.csproj" Aliases="global,GridPulseWeb" />
   </ItemGroup>
 
 </Project>
