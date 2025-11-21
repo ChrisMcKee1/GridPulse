@@ -99,6 +99,7 @@ outagesGroup.MapGet(
 
 app.MapTicketsEndpoints();
 app.MapDispatchEndpoints();
+app.MapCrewEndpoints();
 
 await app.Services.InitializeDatabaseAsync();
 

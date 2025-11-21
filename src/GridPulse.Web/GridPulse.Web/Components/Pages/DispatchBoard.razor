@@ -1,7 +1,11 @@
 @page "/dispatch"
+@using System.Linq
 @using GridPulse.Application.Models
 @using GridPulse.Domain.Enums
 @using GridPulse.Web.Services
+@using GridPulse.Web.Components.Organisms
+@using Radzen
+@using Radzen.Blazor
 @inject GridPulseApiClient ApiClient
 @inject NotificationService NotificationService
 @implements IDisposable
@@ -173,8 +177,28 @@
                 </RadzenStack>
             </RadzenCard>
 
-            <div data-testid="dispatch-timeline">
-                <TicketTimeline Events="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())" />
+            <div class="dispatch-side-panels">
+                <div data-testid="dispatch-timeline">
+                    <TicketTimeline Events="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())" />
+                </div>
+                <div>
+                    @{
+                        var activeCrew = ActiveCrew;
+                    }
+                    @if (activeCrew is not null && selectedTicket is not null)
+                    {
+                        <CrewStatusPanel Crew="activeCrew"
+                                         Timeline="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())"
+                                         IsSubmitting="isSubmittingCrewStatus"
+                                         StatusSubmitted="OnCrewStatusSubmittedAsync" />
+                    }
+                    else
+                    {
+                        <div class="crew-status-panel crew-status-panel--empty">
+                            <p>Select a dispatched ticket to manage crew acknowledgements.</p>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
     </div>
@@ -218,6 +242,7 @@
     private DispatchRecommendationDto? selectedRecommendation;
     private bool isLoadingTickets = true;
     private bool isLoadingRecommendations;
+    private bool isSubmittingCrewStatus;
     private bool isPublishingAssignment;
     private bool isOverrideDialogOpen;
     private string? overrideReason;
@@ -251,7 +276,8 @@
         var filter = new TicketFilter
         {
             Statuses = new[] { TicketStatus.Open, TicketStatus.InProgress },
-            IncludeTimeline = true
+            IncludeTimeline = true,
+            IncludeRecommendations = true
         };
 
         try
@@ -433,7 +459,78 @@
         }
     }
 
+    private async Task OnCrewStatusSubmittedAsync(CrewAssignmentStatus status)
+    {
+        if (selectedTicket?.AssignedCrewId is not Guid crewId)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Crew unavailable", "Assign a crew before sending status updates.");
+            return;
+        }
+
+        isSubmittingCrewStatus = true;
+        errorMessage = null;
+
+        var request = new CrewStatusUpdateRequest
+        {
+            Status = status,
+            Note = status switch
+            {
+                CrewAssignmentStatus.Completed => "Dispatcher marked ticket completed",
+                CrewAssignmentStatus.Acknowledged => "Crew acknowledgement simulated by dispatcher",
+                _ => "Dispatcher updated crew status"
+            }
+        };
+
+        try
+        {
+            await ApiClient.PostCrewStatusAsync(crewId, request);
+            if (selectedTicket is not null)
+            {
+                lastReceiptMessage = BuildCrewStatusToast(status, selectedTicket.Title);
+            }
+
+            lastReceiptMessage ??= "Crew status sent.";
+            NotificationService.Notify(NotificationSeverity.Success, "Crew status sent", lastReceiptMessage);
+            await LoadTicketsAsync(selectedTicket?.Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unable to send crew status: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Crew status failed", ex.Message);
+        }
+        finally
+        {
+            isSubmittingCrewStatus = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
     private bool CanPublishAssignment => selectedTicket is not null && selectedRecommendation is not null && !isPublishingAssignment;
+    private CrewStatusDto? ActiveCrew
+    {
+        get
+        {
+            if (selectedTicket?.AssignedCrewId is not Guid crewId)
+            {
+                return null;
+            }
+
+            var ticketRecommendations = selectedTicket.Recommendations ?? Array.Empty<DispatchRecommendationDto>();
+            var ticketCrew = ticketRecommendations.FirstOrDefault(rec => rec.Crew.CrewId == crewId)?.Crew;
+            if (ticketCrew is not null)
+            {
+                return ticketCrew;
+            }
+
+            var currentRecommendation = recommendations.FirstOrDefault(rec => rec.Crew.CrewId == crewId)?.Crew;
+            if (currentRecommendation is not null)
+            {
+                return currentRecommendation;
+            }
+
+            return selectedRecommendation?.Crew.CrewId == crewId ? selectedRecommendation.Crew : null;
+        }
+    }
 
     private static string ToAriaBool(bool value) => value ? "true" : "false";
 
@@ -447,5 +544,11 @@
         TicketStatus.Resolved or TicketStatus.Closed => "success",
         TicketStatus.Cancelled => "danger",
         _ => "default"
+    };
+
+    private static string BuildCrewStatusToast(CrewAssignmentStatus status, string ticketTitle) => status switch
+    {
+        CrewAssignmentStatus.Acknowledged => $"Crew acknowledgement sent for {ticketTitle}.",
+        _ => $"Crew status '{status}' sent for {ticketTitle}."
     };
 }

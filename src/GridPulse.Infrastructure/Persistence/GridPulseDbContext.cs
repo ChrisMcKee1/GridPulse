@@ -12,6 +12,7 @@ public sealed class GridPulseDbContext(DbContextOptions<GridPulseDbContext> opti
     public DbSet<Crew> Crews => Set<Crew>();
     public DbSet<CrewLocationSnapshot> CrewLocationSnapshots => Set<CrewLocationSnapshot>();
     public DbSet<AssignmentEvent> AssignmentEvents => Set<AssignmentEvent>();
+    public DbSet<AssignmentDelivery> AssignmentDeliveries => Set<AssignmentDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

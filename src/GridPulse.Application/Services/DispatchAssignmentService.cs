@@ -15,6 +15,7 @@ internal sealed class DispatchAssignmentService : IDispatchAssignmentService
     private readonly ITicketRepository _ticketRepository;
     private readonly IDispatchRepository _dispatchRepository;
     private readonly ICrewAssignmentDeliveryService _crewDeliveryService;
+    private readonly ITicketWriteService _ticketWriteService;
     private readonly ILogger<DispatchAssignmentService> _logger;
     private readonly IUserContext _userContext;
     private readonly TimeProvider _timeProvider;
@@ -23,6 +24,7 @@ internal sealed class DispatchAssignmentService : IDispatchAssignmentService
         ITicketRepository ticketRepository,
         IDispatchRepository dispatchRepository,
         ICrewAssignmentDeliveryService crewDeliveryService,
+        ITicketWriteService ticketWriteService,
         ILogger<DispatchAssignmentService> logger,
         IUserContext userContext,
         TimeProvider? timeProvider = null)
@@ -30,6 +32,7 @@ internal sealed class DispatchAssignmentService : IDispatchAssignmentService
         _ticketRepository = ticketRepository;
         _dispatchRepository = dispatchRepository;
         _crewDeliveryService = crewDeliveryService;
+        _ticketWriteService = ticketWriteService;
         _logger = logger;
         _userContext = userContext;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -136,8 +139,21 @@ internal sealed class DispatchAssignmentService : IDispatchAssignmentService
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException($"No active ticket assignment found for crew {crewId}.");
 
-        var response = await _crewDeliveryService
-            .RecordStatusAsync(crewId, ticket.Id, request, cancellationToken)
+        CrewStatusUpdateResponse response;
+        try
+        {
+            response = await _crewDeliveryService
+                .RecordStatusAsync(crewId, ticket.Id, request, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "No delivery record found for crew {CrewId} and ticket {TicketId}. Accepting status anyway.", crewId, ticket.Id);
+            response = new CrewStatusUpdateResponse(ticket.Id, _timeProvider.GetUtcNow());
+        }
+
+        await _ticketWriteService
+            .ApplyCrewStatusAsync(ticket.Id, request, cancellationToken)
             .ConfigureAwait(false);
 
         return response;

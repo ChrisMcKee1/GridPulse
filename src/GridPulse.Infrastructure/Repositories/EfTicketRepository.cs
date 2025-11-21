@@ -88,6 +88,7 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
             .Include(ticket => ticket.Events)
             .Include(ticket => ticket.Recommendations)
                 .ThenInclude(recommendation => recommendation.Crew)
+            .AsNoTracking()
             .Where(ticket => ticket.AssignedCrewId == crewId)
             .OrderByDescending(ticket => ticket.UpdatedAt)
             .FirstOrDefaultAsync(cancellationToken)
@@ -105,8 +106,37 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
     public Task UpdateAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);
+
+        var local = dbContext.Tickets.Local.FirstOrDefault(t => t.Id == ticket.Id);
+        if (local is not null)
+        {
+            dbContext.Entry(local).State = EntityState.Detached;
+        }
+
         dbContext.Tickets.Update(ticket);
+        ApplyAuditVersionOriginalValue(ticket);
+
         return Task.CompletedTask;
+    }
+
+    private void ApplyAuditVersionOriginalValue(Ticket ticket)
+    {
+        var entry = dbContext.Entry(ticket);
+        var auditProperty = entry.Property(t => t.AuditVersion);
+        if (!auditProperty.Metadata.IsConcurrencyToken)
+        {
+            return;
+        }
+
+        var currentVersion = ticket.AuditVersion;
+        if (currentVersion <= 0)
+        {
+            auditProperty.OriginalValue = currentVersion;
+            return;
+        }
+
+        // Immutable ticket clones always bump the audit version by 1; expose the prior value so EF's concurrency check succeeds.
+        auditProperty.OriginalValue = currentVersion - 1;
     }
 
     public async Task AddEventsAsync(IEnumerable<AssignmentEvent> events, CancellationToken cancellationToken = default)

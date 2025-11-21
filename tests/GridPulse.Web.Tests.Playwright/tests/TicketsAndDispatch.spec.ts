@@ -58,4 +58,19 @@ test.describe('Dispatcher board workflows', () => {
     await expect(latestEvent).toContainText(/auto operator/i);
     await expect(latestEvent).toContainText(/score\.composite/i);
   });
+
+  test('allows dispatcher to send crew acknowledgement via status panel', async ({ page }) => {
+    const statusPanel = page.getByTestId('crew-status-panel');
+    await expect(statusPanel).toBeVisible();
+
+    await page.getByTestId('crew-status-select').selectOption('Acknowledged');
+    await page.getByTestId('crew-status-send').click();
+
+    const toast = page.getByTestId('assignment-receipt-toast');
+    await expect(toast).toContainText(/acknowledgement sent/i);
+
+    await expect(page.getByTestId('crew-status-alert')).toHaveCount(0);
+    const timeline = page.getByTestId('dispatch-timeline');
+    await expect(timeline.getByRole('listitem').first()).toContainText(/Crew acknowledged/i);
+  });
 });

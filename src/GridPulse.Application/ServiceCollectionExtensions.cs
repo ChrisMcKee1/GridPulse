@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITicketAutomationService, TicketAutomationService>();
         services.AddScoped<IDispatchOptimizationService, DispatchOptimizationService>();
         services.AddScoped<IDispatchAssignmentService, DispatchAssignmentService>();
+        services.AddScoped<ICrewAssignmentDeliveryService, CrewAssignmentDeliveryService>();
         return services;
     }
 }

@@ -99,17 +99,17 @@ description: "Task list for Ticket Management & Dispatch Optimization"
 
 ### Tests – US3 (write before implementation)
 
-- [ ] T029 [P] [US3] Add unit tests for `CrewAssignmentDeliveryService` covering enqueue/retry logic in `src/GridPulse.Tests.Unit/Application/CrewAssignmentDeliveryServiceTests.cs`.
-- [ ] T030 [P] [US3] Add integration tests for `POST /api/crews/{id}/status` ensuring ProblemDetails for invalid transitions in `src/GridPulse.Tests.Unit/WebApi/CrewStatusEndpointTests.cs`.
-- [ ] T031 [P] [US3] Add Playwright/bUnit coverage for crew acknowledgement controls surfaced in dispatcher UI (e.g., `CrewStatusPanel.razor`) under `tests/GridPulse.Web.Tests.Playwright/TicketsAndDispatch.spec.ts` or new component tests.
+- [x] T029 [P] [US3] Add unit tests for `CrewAssignmentDeliveryService` covering enqueue/retry logic in `src/GridPulse.Tests.Unit/Application/CrewAssignmentDeliveryServiceTests.cs`.
+- [x] T030 [P] [US3] Add integration tests for `POST /api/crews/{id}/status` ensuring ProblemDetails for invalid transitions in `src/GridPulse.Tests.Unit/WebApi/CrewStatusEndpointTests.cs`.
+- [x] T031 [P] [US3] Add Playwright/bUnit coverage for crew acknowledgement controls surfaced in dispatcher UI (e.g., `CrewStatusPanel.razor`) under `tests/GridPulse.Web.Tests.Playwright/TicketsAndDispatch.spec.ts` or new component tests.
 
 ### Implementation – US3
 
-- [ ] T032 [P] [US3] Implement `CrewAssignmentDeliveryService` + persistence of outbound payloads in `src/GridPulse.Application/Services/CrewAssignmentDeliveryService.cs` and call it from assignment pipeline.
-- [ ] T033 [US3] Add `/api/crews/{crewId}/status` Minimal API group (new `CrewEndpointGroup.cs`) plus validation + ProblemDetails responses inside `src/GridPulse.WebApi/Endpoints`.
-- [ ] T034 [P] [US3] Extend typed client + DTOs for `PostCrewStatusAsync` in `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs` and surface ack helpers for testing harness.
-- [ ] T035 [US3] Update dispatcher UI (`DispatchBoard.razor`, `CrewStatusPanel.razor`) to stream crew status updates, escalate when acknowledgements exceed SLA, and show timeline badges.
-- [ ] T036 [US3] Wire crew status events back into ticket workflow (auto transition to `Resolved`, push notifications) within `src/GridPulse.Application/Services/TicketWriteService.cs` + `AssignmentEvent` logging.
+- [x] T032 [P] [US3] Implement `CrewAssignmentDeliveryService` + persistence of outbound payloads in `src/GridPulse.Application/Services/CrewAssignmentDeliveryService.cs` and call it from assignment pipeline.
+- [x] T033 [US3] Add `/api/crews/{crewId}/status` Minimal API group (new `CrewEndpointGroup.cs`) plus validation + ProblemDetails responses inside `src/GridPulse.WebApi/Endpoints`.
+- [x] T034 [P] [US3] Extend typed client + DTOs for `PostCrewStatusAsync` in `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs` and surface ack helpers for testing harness.
+- [x] T035 [US3] Update dispatcher UI (`DispatchBoard.razor`, `CrewStatusPanel.razor`) to stream crew status updates, escalate when acknowledgements exceed SLA, and show timeline badges.
+- [x] T036 [US3] Wire crew status events back into ticket workflow (auto transition to `Resolved`, push notifications) within `src/GridPulse.Application/Services/TicketWriteService.cs` + `AssignmentEvent` logging.
 
 **Checkpoint**: All clients (operator, dispatcher, crew placeholder) synchronized with full lifecycle telemetry.
 

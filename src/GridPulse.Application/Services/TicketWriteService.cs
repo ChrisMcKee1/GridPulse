@@ -91,9 +91,90 @@ internal sealed class TicketWriteService : ITicketWriteService
         return duplicates;
     }
 
-    public Task<Ticket> ApplyCrewStatusAsync(Guid ticketId, CrewStatusUpdateRequest request, CancellationToken cancellationToken = default)
+    public async Task<Ticket> ApplyCrewStatusAsync(Guid ticketId, CrewStatusUpdateRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Crew status workflow will be wired during US3 implementation.");
+        ArgumentNullException.ThrowIfNull(request);
+
+        var ticket = await _ticketRepository.GetByIdAsync(ticketId, cancellationToken).ConfigureAwait(false)
+                     ?? throw new InvalidOperationException($"Ticket {ticketId} was not found.");
+
+        if (ticket.AssignedCrewId is null)
+        {
+            throw new InvalidOperationException("Crew status updates are only allowed when a crew is assigned to the ticket.");
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var targetStatus = DetermineTicketStatus(ticket.Status, request.Status);
+        if (targetStatus is TicketStatus nextStatus && nextStatus != ticket.Status)
+        {
+            EnsureTransitionAllowed(ticket.Status, nextStatus);
+        }
+
+        var updatedTicket = CloneTicket(ticket, targetStatus ?? ticket.Status, now);
+        var crewEvent = BuildCrewEvent(updatedTicket, request, now);
+        updatedTicket.Events.Add(crewEvent);
+
+        await _ticketRepository.UpdateAsync(updatedTicket, cancellationToken).ConfigureAwait(false);
+        await _ticketRepository.AddEventsAsync(new[] { crewEvent }, cancellationToken).ConfigureAwait(false);
+        await _ticketRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return updatedTicket;
+    }
+
+    private static TicketStatus? DetermineTicketStatus(TicketStatus currentStatus, CrewAssignmentStatus crewStatus)
+    {
+        return crewStatus switch
+        {
+            CrewAssignmentStatus.Acknowledged or CrewAssignmentStatus.EnRoute or CrewAssignmentStatus.OnScene or CrewAssignmentStatus.Paused
+                => currentStatus == TicketStatus.InProgress ? null : TicketStatus.InProgress,
+            CrewAssignmentStatus.Completed => TicketStatus.Resolved,
+            _ => null
+        };
+    }
+
+    private AssignmentEvent BuildCrewEvent(Ticket ticket, CrewStatusUpdateRequest request, DateTimeOffset timestamp)
+    {
+        var eventType = request.Status switch
+        {
+            CrewAssignmentStatus.Acknowledged => AssignmentEventType.CrewAcknowledged,
+            CrewAssignmentStatus.EnRoute => AssignmentEventType.CrewEnRoute,
+            CrewAssignmentStatus.OnScene => AssignmentEventType.CrewOnScene,
+            CrewAssignmentStatus.Paused => AssignmentEventType.CrewPaused,
+            CrewAssignmentStatus.Completed => AssignmentEventType.CrewCompleted,
+            _ => AssignmentEventType.TicketEdited
+        };
+
+        var details = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["status"] = request.Status.ToString()
+        };
+
+        if (!string.IsNullOrWhiteSpace(request.Note))
+        {
+            details["note"] = request.Note!;
+        }
+
+        if (request.Location is { } location)
+        {
+            details["latitude"] = location.Latitude.ToString(CultureInfo.InvariantCulture);
+            details["longitude"] = location.Longitude.ToString(CultureInfo.InvariantCulture);
+            details["capturedAt"] = location.CapturedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+            if (location.SpeedMph is double speed)
+            {
+                details["speedMph"] = speed.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        return new AssignmentEvent
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            CrewId = ticket.AssignedCrewId,
+            EventType = eventType,
+            Details = details,
+            Actor = "crew",
+            OccurredAt = timestamp
+        };
     }
 
     private static void EnsureTransitionAllowed(TicketStatus current, TicketStatus next)

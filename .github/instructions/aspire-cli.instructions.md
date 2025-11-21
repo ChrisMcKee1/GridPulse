@@ -1,5 +1,6 @@
 ---
 description: ".NET Aspire CLI Cheat Sheet - Quick reference for common Aspire CLI commands and workflows."
+applyTo: '**'
 ---
 # .NET Aspire CLI Cheat Sheet
 

@@ -1,0 +1,127 @@
+@using System.Linq
+@using GridPulse.Application.Models
+@using GridPulse.Domain.Enums
+
+<div class="crew-status-panel" data-testid="crew-status-panel">
+    <div class="crew-status-panel__header">
+        <div>
+            <h4>@(Crew?.DisplayName ?? "No crew assigned")</h4>
+            <p class="dispatch-subtitle">Monitor acknowledgements and simulate crew responses.</p>
+        </div>
+        @if (Crew is not null)
+        {
+            <span class="crew-status-panel__badge">@Crew.Status</span>
+        }
+    </div>
+
+    @if (ShouldShowAcknowledgementAlert)
+    {
+        <div class="crew-status-panel__alert @(IsAcknowledgementOverdue ? "danger" : "warning")"
+             data-testid="crew-status-alert"
+             role="alert">
+            @AlertText
+        </div>
+    }
+
+    <div class="crew-status-panel__details">
+        @if (Crew is null)
+        {
+            <p>Select a ticket with an assigned crew to enable status updates.</p>
+        }
+        else
+        {
+            <ul>
+                <li><strong>Tickets:</strong> @Crew.CurrentTicketCount active</li>
+                <li><strong>Skills:</strong> @string.Join(", ", Crew.Skills)</li>
+                <li><strong>Last update:</strong> @Crew.LastStatusUpdate.ToLocalTime().ToString("g")</li>
+            </ul>
+        }
+    </div>
+
+    <div class="crew-status-panel__controls">
+        <label for="crew-status-select">Crew status</label>
+        <select id="crew-status-select"
+                class="crew-status-panel__select"
+                data-testid="crew-status-select"
+                value="@selectedStatus"
+                @onchange="OnStatusChanged"
+                disabled="@(!CanSubmit)">
+            @foreach (var status in StatusOptions)
+            {
+                <option value="@status">@GetStatusLabel(status)</option>
+            }
+        </select>
+        <button type="button"
+                class="crew-status-panel__send"
+                data-testid="crew-status-send"
+                disabled="@(!CanSubmit)"
+                @onclick="OnSendAsync">
+            @(IsSubmitting ? "Sending..." : "Send update")
+        </button>
+    </div>
+</div>
+
+@code {
+    private static readonly CrewAssignmentStatus[] StatusOptions = Enum.GetValues<CrewAssignmentStatus>();
+    private static readonly TimeSpan AcknowledgementSla = TimeSpan.FromMinutes(5);
+    private CrewAssignmentStatus selectedStatus = CrewAssignmentStatus.Acknowledged;
+
+    [Parameter]
+    public CrewStatusDto? Crew { get; set; }
+
+    [Parameter]
+    public IReadOnlyCollection<AssignmentEventDto> Timeline { get; set; } = Array.Empty<AssignmentEventDto>();
+
+    [Parameter]
+    public bool IsSubmitting { get; set; }
+
+    [Parameter]
+    public EventCallback<CrewAssignmentStatus> StatusSubmitted { get; set; }
+
+    private bool HasCrew => Crew is not null;
+    private bool CanSubmit => HasCrew && !IsSubmitting;
+
+    private bool HasAcknowledged => Crew is not null
+        && Timeline.Any(evt => evt.EventType == AssignmentEventType.CrewAcknowledged && evt.CrewId == Crew.CrewId);
+
+    private AssignmentEventDto? LatestAssignmentPublished => Crew is null
+        ? null
+        : Timeline
+            .Where(evt => evt.EventType == AssignmentEventType.AssignmentPublished && evt.CrewId == Crew.CrewId)
+            .OrderByDescending(evt => evt.OccurredAt)
+            .FirstOrDefault();
+
+    private bool ShouldShowAcknowledgementAlert => !HasAcknowledged && LatestAssignmentPublished is not null;
+
+    private bool IsAcknowledgementOverdue => ShouldShowAcknowledgementAlert
+        && LatestAssignmentPublished is { } assignment
+        && DateTimeOffset.UtcNow - assignment.OccurredAt > AcknowledgementSla;
+
+    private string AlertText => IsAcknowledgementOverdue
+        ? "Crew acknowledgement overdue — escalate with ops."
+        : "Awaiting acknowledgement from crew.";
+
+    private void OnStatusChanged(ChangeEventArgs args)
+    {
+        if (args.Value is string raw && Enum.TryParse(raw, true, out CrewAssignmentStatus parsed))
+        {
+            selectedStatus = parsed;
+        }
+    }
+
+    private async Task OnSendAsync()
+    {
+        if (!CanSubmit)
+        {
+            return;
+        }
+
+        await StatusSubmitted.InvokeAsync(selectedStatus);
+    }
+
+    private static string GetStatusLabel(CrewAssignmentStatus status) => status switch
+    {
+        CrewAssignmentStatus.OnScene => "On Scene",
+        _ => status.ToString()
+    };
+}

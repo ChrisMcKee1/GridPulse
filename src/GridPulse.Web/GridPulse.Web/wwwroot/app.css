@@ -431,6 +431,103 @@ h1:focus {
     gap: 1.25rem;
 }
 
+.dispatch-side-panels {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .dispatch-side-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+.crew-status-panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    background-color: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+
+.crew-status-panel--empty {
+    text-align: center;
+    color: #6b7280;
+}
+
+.crew-status-panel__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.crew-status-panel__badge {
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.crew-status-panel__alert {
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.crew-status-panel__alert.warning {
+    background-color: #fffbeb;
+    color: #92400e;
+}
+
+.crew-status-panel__alert.danger {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.crew-status-panel__details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.75rem 0;
+    color: #4b5563;
+    font-size: 0.9rem;
+}
+
+.crew-status-panel__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.crew-status-panel__select {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.6rem;
+}
+
+.crew-status-panel__send {
+    border: none;
+    border-radius: 0.5rem;
+    background-color: #2563eb;
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.crew-status-panel__send:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .dispatch-card-header {
     display: flex;
     justify-content: space-between;

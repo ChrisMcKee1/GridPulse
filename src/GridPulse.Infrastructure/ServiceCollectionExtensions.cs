@@ -1,7 +1,6 @@
 using System;
 using GridPulse.Application.Abstractions;
 using GridPulse.Infrastructure.Auth;
-using GridPulse.Infrastructure.Delivery;
 using GridPulse.Infrastructure.Persistence.SampleData;
 using GridPulse.Infrastructure.Repositories;
 using GridPulse.Infrastructure.Telemetry;
@@ -26,7 +25,6 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IDataSeeder, OutageCsvSampleDataSeeder>();
         services.AddScoped<IDataSeeder, TicketSeed>();
-        services.AddScoped<ICrewAssignmentDeliveryService, LoopbackCrewAssignmentDeliveryService>();
 
         services.AddSingleton<MockCrewTelemetryFeed>();
         services.AddSingleton<ICrewTelemetryFeed>(sp => sp.GetRequiredService<MockCrewTelemetryFeed>());
@@ -42,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutageRepository, EfOutageRepository>();
         services.AddScoped<ITicketRepository, EfTicketRepository>();
         services.AddScoped<IDispatchRepository, EfDispatchRepository>();
+        services.AddScoped<IAssignmentDeliveryRepository, EfAssignmentDeliveryRepository>();
         return services;
     }
 

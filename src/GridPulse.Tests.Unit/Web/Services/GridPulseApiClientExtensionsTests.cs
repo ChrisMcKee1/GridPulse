@@ -146,7 +146,7 @@ public class GridPulseApiClientExtensionsTests
 
         var request = new CrewStatusUpdateRequest
         {
-            Status = CrewStatus.EnRoute,
+            Status = CrewAssignmentStatus.EnRoute,
             Note = "Departing ops center",
             Location = new CrewLocationSnapshotDto(35.22m, -80.84m, DateTimeOffset.UtcNow, 40)
         };
