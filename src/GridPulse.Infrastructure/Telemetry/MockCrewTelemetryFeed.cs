@@ -12,7 +12,7 @@ using System.Diagnostics.Metrics;
 
 namespace GridPulse.Infrastructure.Telemetry;
 
-internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedMonitor
+internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedMonitor, ICrewTelemetryFeed
 {
     private readonly Meter _meter = new(TicketingDiagnostics.CrewTelemetryMeter);
     private readonly Counter<int> _samplesCounter;
@@ -151,6 +151,48 @@ internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedM
     }
 
     private sealed record GeoPoint(decimal Latitude, decimal Longitude);
+
+    public async Task<IReadOnlyCollection<CrewLocationSnapshot>> GetLatestSnapshotsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDispatchRepository>();
+        var crews = await repository.GetCrewsAsync(cancellationToken).ConfigureAwait(false);
+        var snapshots = new List<CrewLocationSnapshot>();
+
+        foreach (var crew in crews)
+        {
+            var snapshot = await repository.GetLatestLocationAsync(crew.Id, cancellationToken).ConfigureAwait(false);
+            if (snapshot is not null)
+            {
+                snapshots.Add(snapshot);
+            }
+        }
+
+        return snapshots;
+    }
+
+    public async Task<CrewLocationSnapshot?> GetLatestForCrewAsync(Guid crewId, CancellationToken cancellationToken = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDispatchRepository>();
+        return await repository.GetLatestLocationAsync(crewId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RecordSnapshotAsync(CrewLocationSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDispatchRepository>();
+        await repository.AddLocationSnapshotsAsync(new[] { snapshot }, cancellationToken).ConfigureAwait(false);
+        await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<DateTimeOffset?> GetLastHeartbeatAsync(CancellationToken cancellationToken = default)
+    {
+        var heartbeat = _lastHeartbeat == DateTimeOffset.MinValue ? (DateTimeOffset?)null : _lastHeartbeat;
+        return Task.FromResult(heartbeat);
+    }
 }
 
 internal sealed class AssignmentQueueMonitor(ILogger<AssignmentQueueMonitor> logger) : IAssignmentQueueMonitor

@@ -1,0 +1,451 @@
+@page "/dispatch"
+@using GridPulse.Application.Models
+@using GridPulse.Domain.Enums
+@using GridPulse.Web.Services
+@inject GridPulseApiClient ApiClient
+@inject NotificationService NotificationService
+@implements IDisposable
+
+<RadzenStack class="dispatch-page" Gap="16px">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+        <div>
+            <h1 data-testid="dispatch-heading">Dispatch Board</h1>
+            <p class="dispatch-subtitle">Review tickets awaiting crew assignments, evaluate telemetry, and publish decisions.</p>
+        </div>
+
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Disabled="@isLoadingTickets" Click="async () => await LoadTicketsAsync()">Refresh</RadzenButton>
+    </RadzenStack>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Closeable="true" Text="@errorMessage" />
+    }
+
+    @if (!string.IsNullOrEmpty(lastReceiptMessage))
+    {
+        <div class="dispatch-toast" data-testid="assignment-receipt-toast" role="status" aria-live="polite">
+            <span>@lastReceiptMessage</span>
+            <button type="button" class="dispatch-toast__close" @onclick="() => lastReceiptMessage = null">Dismiss</button>
+        </div>
+    }
+
+    <div class="dispatch-layout">
+        <RadzenCard class="dispatch-ticket-card">
+            <div class="dispatch-card-header">
+                <div>
+                    <h3>Tickets awaiting dispatch</h3>
+                    <p class="dispatch-subtitle">Open and in-progress work</p>
+                </div>
+            </div>
+
+            <div class="dispatch-ticket-list" data-testid="dispatch-ticket-list">
+                @if (isLoadingTickets)
+                {
+                    <RadzenSkeleton Lines="6" />
+                }
+                else if (dispatchableTickets.Count == 0)
+                {
+                    <p>No tickets require dispatcher attention right now.</p>
+                }
+                else
+                {
+                    @foreach (var ticket in dispatchableTickets)
+                    {
+                        var isActive = ticket.Id == selectedTicketId;
+                        <button type="button"
+                            class="dispatch-ticket-list__item @(isActive ? "active" : string.Empty)"
+                            data-active="@isActive"
+                                aria-pressed="@ToAriaBool(isActive)"
+                            @onclick="() => OnTicketSelectedAsync(ticket.Id)">
+                            <div class="dispatch-ticket-list__title">@ticket.Title</div>
+                            <div class="dispatch-ticket-list__meta">
+                                <StatusChip Label="@ticket.Status.ToString()" Variant="@GetStatusVariant(ticket.Status)" />
+                                <span>Priority @ticket.Priority</span>
+                                <span>@ticket.CustomerImpact customers</span>
+                            </div>
+                        </button>
+                    }
+                }
+            </div>
+        </RadzenCard>
+
+        <div class="dispatch-detail-column">
+            <RadzenCard class="dispatch-recommendations-card">
+                <RadzenStack Gap="12px">
+                    <div class="dispatch-card-header">
+                        <div>
+                            <h3>Recommendations</h3>
+                            @if (selectedTicket is not null)
+                            {
+                                <p class="dispatch-subtitle">@selectedTicket.Title</p>
+                            }
+                        </div>
+                        <div class="dispatch-recommendation-hints">
+                            @if (selectedRecommendation is not null)
+                            {
+                                <span>Selected crew: <strong>@selectedRecommendation.Crew.DisplayName</strong></span>
+                            }
+                            @if (selectedTicket is not null)
+                            {
+                                <span>Updated @selectedTicket.UpdatedAt.ToLocalTime().ToString("g")</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (isLoadingRecommendations)
+                    {
+                        <RadzenSkeleton Lines="6" />
+                    }
+                    else if (recommendations.Count == 0)
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Text="No recommendations available for the selected ticket." />
+                    }
+                    else
+                    {
+                        var staleCount = recommendations.Count(rec => rec.Crew.IsTelemetryStale);
+                        if (staleCount > 0)
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Warning" Text="@BuildTelemetryWarning(staleCount)" />
+                        }
+
+                            <div class="dispatch-recommendations-grid"
+                                data-testid="crew-recommendations-grid"
+                                role="table"
+                                aria-label="Crew recommendations"
+                                aria-busy="@ToAriaBool(isLoadingRecommendations)">
+                            <div class="dispatch-recommendations-grid__header" role="row">
+                                <span role="columnheader">Crew</span>
+                                <span role="columnheader">Score</span>
+                                <span role="columnheader">Workload</span>
+                                <span role="columnheader">Actions</span>
+                            </div>
+                            @foreach (var recommendation in recommendations)
+                            {
+                                var isActive = selectedRecommendation?.Crew.CrewId == recommendation.Crew.CrewId;
+                                <div class="dispatch-recommendations-grid__row @(isActive ? "active" : string.Empty)"
+                                     role="row"
+                                     aria-selected="@ToAriaBool(isActive)"
+                                     data-selected="@ToAriaBool(recommendation.IsAutoSelected)"
+                                     tabindex="0"
+                                     @onclick="() => SelectRecommendation(recommendation)">
+                                    <div class="dispatch-recommendations-grid__crew" role="cell">
+                                        <div class="dispatch-recommendations-grid__crew-name">@recommendation.Crew.DisplayName</div>
+                                        <div class="dispatch-recommendations-grid__crew-meta">
+                                            <span>@recommendation.Crew.Status</span>
+                                            <span>@string.Join(", ", recommendation.Crew.Skills)</span>
+                                        </div>
+                                        @if (recommendation.Crew.IsTelemetryStale)
+                                        {
+                                            <span class="dispatch-telemetry-chip" data-testid="telemetry-stale-badge">Telemetry stale</span>
+                                        }
+                                    </div>
+                                    <div class="dispatch-recommendations-grid__score" role="cell">
+                                        <span class="dispatch-score-chip" data-testid="score-chip">@recommendation.CompositeScore.ToString("P0")</span>
+                                        <small>ETA @recommendation.EtaMinutes mins</small>
+                                    </div>
+                                    <div class="dispatch-recommendations-grid__workload" role="cell">
+                                        <span>@recommendation.Crew.CurrentTicketCount active</span>
+                                        <small>@(recommendation.ScoreComponents.TryGetValue("workload", out var workloadScore) ? $"Workload {workloadScore:P0}" : string.Empty)</small>
+                                    </div>
+                                    <div class="dispatch-recommendations-grid__actions" role="cell">
+                                        @if (recommendation.IsAutoSelected)
+                                        {
+                                            <span class="dispatch-auto-chip">Auto</span>
+                                        }
+                                        @if (recommendation.IsOverride && !string.IsNullOrWhiteSpace(recommendation.OverrideReason))
+                                        {
+                                            <span class="dispatch-override-chip">Override: @recommendation.OverrideReason</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
+                        <RadzenButton Icon="check" Disabled="@(!CanPublishAssignment)" Click="async () => await PublishAssignmentAsync(isOverride: false)">
+                            @(isPublishingAssignment ? "Publishing..." : "Publish assignment")
+                        </RadzenButton>
+                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="swap_horiz" Disabled="@(!CanPublishAssignment)" Click="OpenOverrideDialog">
+                            Override selection
+                        </RadzenButton>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+
+            <div data-testid="dispatch-timeline">
+                <TicketTimeline Events="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())" />
+            </div>
+        </div>
+    </div>
+</RadzenStack>
+
+@if (isOverrideDialogOpen && selectedRecommendation is not null && selectedTicket is not null)
+{
+    <div class="dispatch-override-dialog__backdrop">
+        <div class="dispatch-override-dialog" role="dialog" aria-label="Override recommendation">
+            <div class="dispatch-override-dialog__header">
+                <h3>Override recommendation</h3>
+                <button type="button" class="dispatch-override-dialog__close" @onclick="CloseOverrideDialog">✕</button>
+            </div>
+            <p class="dispatch-subtitle">Provide a brief justification before sending the assignment.</p>
+            <label for="override-reason">Override reason</label>
+            <RadzenTextArea id="override-reason"
+                            @bind-Value="overrideReason"
+                            Name="OverrideReason"
+                            Rows="3"
+                            Placeholder="Explain why a non-automatic crew was selected" />
+            @if (!string.IsNullOrEmpty(overrideErrorMessage))
+            {
+                <div class="dispatch-override-error">@overrideErrorMessage</div>
+            }
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
+                <RadzenButton Icon="send" ButtonStyle="ButtonStyle.Primary" Disabled="@isPublishingAssignment" Click="async () => await PublishAssignmentAsync(isOverride: true)">
+                    @(isPublishingAssignment ? "Sending..." : "Send assignment")
+                </RadzenButton>
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CloseOverrideDialog">Cancel</RadzenButton>
+            </RadzenStack>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly TimeSpan RecommendationRefreshInterval = TimeSpan.FromSeconds(45);
+    private IReadOnlyList<TicketDto> dispatchableTickets = Array.Empty<TicketDto>();
+    private TicketDto? selectedTicket;
+    private Guid? selectedTicketId;
+    private IReadOnlyList<DispatchRecommendationDto> recommendations = Array.Empty<DispatchRecommendationDto>();
+    private DispatchRecommendationDto? selectedRecommendation;
+    private bool isLoadingTickets = true;
+    private bool isLoadingRecommendations;
+    private bool isPublishingAssignment;
+    private bool isOverrideDialogOpen;
+    private string? overrideReason;
+    private string? overrideErrorMessage;
+    private string? errorMessage;
+    private string? lastReceiptMessage;
+    private CancellationTokenSource? recommendationsCts;
+    private CancellationTokenSource? refreshLoopCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTicketsAsync();
+        refreshLoopCts = new CancellationTokenSource();
+        _ = RefreshRecommendationsLoopAsync(refreshLoopCts.Token);
+    }
+
+    public void Dispose()
+    {
+        recommendationsCts?.Cancel();
+        recommendationsCts?.Dispose();
+
+        refreshLoopCts?.Cancel();
+        refreshLoopCts?.Dispose();
+    }
+
+    private async Task LoadTicketsAsync(Guid? preferredSelection = null)
+    {
+        isLoadingTickets = true;
+        errorMessage = null;
+
+        var filter = new TicketFilter
+        {
+            Statuses = new[] { TicketStatus.Open, TicketStatus.InProgress },
+            IncludeTimeline = true
+        };
+
+        try
+        {
+            var result = await ApiClient.GetTicketsAsync(filter);
+            dispatchableTickets = result.Items
+                .Where(ticket => ticket.Status is TicketStatus.Open or TicketStatus.InProgress)
+                .OrderByDescending(ticket => ticket.Priority)
+                .ThenByDescending(ticket => ticket.UpdatedAt)
+                .ToArray();
+
+            var desiredId = preferredSelection ?? selectedTicketId ?? dispatchableTickets.FirstOrDefault()?.Id;
+            selectedTicket = desiredId is null
+                ? dispatchableTickets.FirstOrDefault()
+                : dispatchableTickets.FirstOrDefault(ticket => ticket.Id == desiredId) ?? dispatchableTickets.FirstOrDefault();
+
+            selectedTicketId = selectedTicket?.Id;
+
+            if (selectedTicket is not null)
+            {
+                await LoadRecommendationsAsync(selectedTicket.Id);
+            }
+            else
+            {
+                recommendations = Array.Empty<DispatchRecommendationDto>();
+                selectedRecommendation = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unable to load dispatch tickets: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingTickets = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadRecommendationsAsync(Guid ticketId)
+    {
+        recommendationsCts?.Cancel();
+        recommendationsCts?.Dispose();
+        recommendationsCts = new CancellationTokenSource();
+
+        isLoadingRecommendations = true;
+        errorMessage = null;
+
+        try
+        {
+            var envelope = await ApiClient.GetRecommendationsAsync(ticketId, recommendationsCts.Token);
+            recommendations = envelope.Recommendations
+                .OrderByDescending(rec => rec.CompositeScore)
+                .ToArray();
+
+            selectedRecommendation = recommendations.FirstOrDefault(rec => rec.IsAutoSelected) ?? recommendations.FirstOrDefault();
+        }
+        catch (OperationCanceledException)
+        {
+            // ignored
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unable to load recommendations: {ex.Message}";
+            recommendations = Array.Empty<DispatchRecommendationDto>();
+            selectedRecommendation = null;
+        }
+        finally
+        {
+            isLoadingRecommendations = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnTicketSelectedAsync(Guid ticketId)
+    {
+        if (selectedTicketId == ticketId)
+        {
+            return;
+        }
+
+        var ticket = dispatchableTickets.FirstOrDefault(t => t.Id == ticketId);
+        if (ticket is null)
+        {
+            return;
+        }
+
+        selectedTicket = ticket;
+        selectedTicketId = ticket.Id;
+        await LoadRecommendationsAsync(ticket.Id);
+    }
+
+    private void SelectRecommendation(DispatchRecommendationDto recommendation)
+    {
+        selectedRecommendation = recommendation;
+    }
+
+    private void OpenOverrideDialog()
+    {
+        if (!CanPublishAssignment)
+        {
+            return;
+        }
+
+        overrideReason = string.Empty;
+        overrideErrorMessage = null;
+        isOverrideDialogOpen = true;
+    }
+
+    private void CloseOverrideDialog()
+    {
+        isOverrideDialogOpen = false;
+        overrideReason = null;
+        overrideErrorMessage = null;
+    }
+
+    private async Task PublishAssignmentAsync(bool isOverride)
+    {
+        if (selectedTicket is null || selectedRecommendation is null)
+        {
+            return;
+        }
+
+        if (isOverride && string.IsNullOrWhiteSpace(overrideReason))
+        {
+            overrideErrorMessage = "Override reason is required.";
+            return;
+        }
+
+        isPublishingAssignment = true;
+        overrideErrorMessage = null;
+        errorMessage = null;
+
+        var request = new DispatchAssignmentRequest
+        {
+            TicketId = selectedTicket.Id,
+            CrewId = selectedRecommendation.Crew.CrewId,
+            OverrideReason = isOverride ? overrideReason : null,
+            NotifyCrewChannels = new[] { "push" }
+        };
+
+        try
+        {
+            var receipt = await ApiClient.PublishAssignmentAsync(request);
+            lastReceiptMessage = $"Assignment queued for {selectedRecommendation.Crew.DisplayName} (tracking {receipt.TrackingId}).";
+            CloseOverrideDialog();
+            await LoadTicketsAsync(selectedTicket.Id);
+            NotificationService.Notify(NotificationSeverity.Success, "Assignment queued", lastReceiptMessage);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unable to publish assignment: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Assignment failed", ex.Message);
+        }
+        finally
+        {
+            isPublishingAssignment = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshRecommendationsLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(RecommendationRefreshInterval, cancellationToken);
+
+                if (selectedTicketId is Guid ticketId && !isLoadingTickets)
+                {
+                    await InvokeAsync(() => LoadRecommendationsAsync(ticketId));
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // expected during disposal
+        }
+    }
+
+    private bool CanPublishAssignment => selectedTicket is not null && selectedRecommendation is not null && !isPublishingAssignment;
+
+    private static string ToAriaBool(bool value) => value ? "true" : "false";
+
+    private static string BuildTelemetryWarning(int staleCount) =>
+        $"Telemetry stale for {staleCount} crew{(staleCount == 1 ? string.Empty : "s")}.";
+
+    private static string GetStatusVariant(TicketStatus status) => status switch
+    {
+        TicketStatus.Open => "warning",
+        TicketStatus.InProgress => "info",
+        TicketStatus.Resolved or TicketStatus.Closed => "success",
+        TicketStatus.Cancelled => "danger",
+        _ => "default"
+    };
+}

@@ -72,6 +72,28 @@ internal sealed class EfDispatchRepository(GridPulseDbContext dbContext) : IDisp
         return recommendations;
     }
 
+    public async Task ReplaceRecommendationsForTicketAsync(
+        Guid ticketId,
+        IEnumerable<DispatchRecommendation> recommendations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(recommendations);
+
+        var existing = await dbContext.DispatchRecommendations
+            .Where(recommendation => recommendation.TicketId == ticketId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing.Count > 0)
+        {
+            dbContext.DispatchRecommendations.RemoveRange(existing);
+        }
+
+        await dbContext.DispatchRecommendations
+            .AddRangeAsync(recommendations, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task UpdateRecommendationsAsync(IEnumerable<DispatchRecommendation> recommendations)
     {
         ArgumentNullException.ThrowIfNull(recommendations);

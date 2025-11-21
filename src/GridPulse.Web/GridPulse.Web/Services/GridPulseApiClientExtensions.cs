@@ -67,6 +67,74 @@ public static class GridPulseApiClientExtensions
         return await DeserializeAsync<TicketDto>(response.Content, cancellationToken).ConfigureAwait(false);
     }
 
+    public static async Task<DispatchRecommendationsEnvelope> GetRecommendationsAsync(
+        this GridPulseApiClient client,
+        Guid ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        if (ticketId == Guid.Empty)
+        {
+            throw new ArgumentException("Ticket identifier must be provided.", nameof(ticketId));
+        }
+
+        var endpoint = $"api/dispatch/recommendations?ticketId={ticketId:D}";
+        var envelope = await client.HttpClient
+            .GetFromJsonAsync<DispatchRecommendationsEnvelope>(endpoint, SerializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        return envelope ?? throw new InvalidOperationException("Dispatch recommendations could not be retrieved from the API.");
+    }
+
+    public static async Task<AssignmentReceiptDto> PublishAssignmentAsync(
+        this GridPulseApiClient client,
+        DispatchAssignmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.TicketId == Guid.Empty)
+        {
+            throw new ArgumentException("TicketId must be provided.", nameof(request));
+        }
+
+        if (request.CrewId == Guid.Empty)
+        {
+            throw new ArgumentException("CrewId must be provided.", nameof(request));
+        }
+
+        var response = await client.HttpClient
+            .PostAsJsonAsync("api/dispatch/assignments", request, SerializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+        return await DeserializeAsync<AssignmentReceiptDto>(response.Content, cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async Task<CrewStatusUpdateResponse> PostCrewStatusAsync(
+        this GridPulseApiClient client,
+        Guid crewId,
+        CrewStatusUpdateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (crewId == Guid.Empty)
+        {
+            throw new ArgumentException("Crew identifier must be provided.", nameof(crewId));
+        }
+
+        var response = await client.HttpClient
+            .PostAsJsonAsync($"api/crews/{crewId:D}/status", request, SerializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+        return await DeserializeAsync<CrewStatusUpdateResponse>(response.Content, cancellationToken).ConfigureAwait(false);
+    }
+
     private static string BuildTicketsQueryString(TicketFilter filter)
     {
         var parameters = new List<string>();

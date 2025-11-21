@@ -91,6 +91,11 @@ internal sealed class TicketWriteService : ITicketWriteService
         return duplicates;
     }
 
+    public Task<Ticket> ApplyCrewStatusAsync(Guid ticketId, CrewStatusUpdateRequest request, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException("Crew status workflow will be wired during US3 implementation.");
+    }
+
     private static void EnsureTransitionAllowed(TicketStatus current, TicketStatus next)
     {
         if (!AllowedTransitions.TryGetValue(current, out var allowed) || !allowed.Contains(next))

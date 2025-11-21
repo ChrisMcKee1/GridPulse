@@ -74,18 +74,18 @@ description: "Task list for Ticket Management & Dispatch Optimization"
 
 ### Tests – US2 (write before implementation)
 
-- [ ] T020 [P] [US2] Add unit tests for `DispatchOptimizationService` scoring weights and stale telemetry handling in `src/GridPulse.Tests.Unit/Application/DispatchOptimizationServiceTests.cs`.
-- [ ] T021 [P] [US2] Add integration tests for `/api/dispatch/recommendations` + `/api/dispatch/assignments` using `WebApplicationFactory` and seeded crews under `src/GridPulse.Tests.Unit/WebApi/DispatchEndpointTests.cs`.
-- [ ] T022 [P] [US2] Expand Playwright scenario `tests/GridPulse.Web.Tests.Playwright/TicketsAndDispatch.spec.ts` to cover dispatcher board interactions, override dialog, and assignment confirmation toast.
+- [x] T020 [P] [US2] Add unit tests for `DispatchOptimizationService` scoring weights and stale telemetry handling in `src/GridPulse.Tests.Unit/Application/DispatchOptimizationServiceTests.cs`.
+- [x] T021 [P] [US2] Add integration tests for `/api/dispatch/recommendations` + `/api/dispatch/assignments` using `WebApplicationFactory` and seeded crews under `src/GridPulse.Tests.Unit/WebApi/DispatchEndpointTests.cs`.
+- [x] T022 [P] [US2] Expand Playwright scenario `tests/GridPulse.Web.Tests.Playwright/TicketsAndDispatch.spec.ts` to cover dispatcher board interactions, override dialog, and assignment confirmation toast.
 
 ### Implementation – US2
 
-- [ ] T023 [P] [US2] Implement `DispatchOptimizationService` + helper scoring components in `src/GridPulse.Application/Services/DispatchOptimizationService.cs`, persisting `DispatchRecommendation` rows via repository.
-- [ ] T024 [US2] Build `/api/dispatch/recommendations` + `/api/dispatch/assignments` groups in `src/GridPulse.WebApi/Endpoints/DispatchEndpointGroup.cs`, ensuring ProblemDetails for stale telemetry + override justification.
-- [ ] T025 [P] [US2] Implement assignment persistence + workload recalculation in `src/GridPulse.Application/Services/DispatchAssignmentService.cs`, updating crew utilization + `AssignmentEvent` history.
-- [ ] T026 [P] [US2] Extend `GridPulseApiClient` typed methods for `GetRecommendationsAsync` and `PublishAssignmentAsync` inside `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs`.
-- [ ] T027 [US2] Build `DispatchBoard.razor` UI (Radzen grids/cards) to display recommendations, override prompts, telemetry freshness alerts, and assignment publishing workflow.
-- [ ] T028 [US2] Persist override rationale + scoring snapshots in `src/GridPulse.Infrastructure/Repositories/EfDispatchRepository.cs` and surface them via DTOs for audit timelines.
+- [x] T023 [P] [US2] Implement `DispatchOptimizationService` + helper scoring components in `src/GridPulse.Application/Services/DispatchOptimizationService.cs`, persisting `DispatchRecommendation` rows via repository.
+- [x] T024 [US2] Build `/api/dispatch/recommendations` + `/api/dispatch/assignments` groups in `src/GridPulse.WebApi/Endpoints/DispatchEndpointGroup.cs`, ensuring ProblemDetails for stale telemetry + override justification.
+- [x] T025 [P] [US2] Implement assignment persistence + workload recalculation in `src/GridPulse.Application/Services/DispatchAssignmentService.cs`, updating crew utilization + `AssignmentEvent` history.
+- [x] T026 [P] [US2] Extend `GridPulseApiClient` typed methods for `GetRecommendationsAsync` and `PublishAssignmentAsync` inside `src/GridPulse.Web/Services/GridPulseApiClientExtensions.cs`.
+- [x] T027 [US2] Build `DispatchBoard.razor` UI (Radzen grids/cards) to display recommendations, override prompts, telemetry freshness alerts, and assignment publishing workflow.
+- [x] T028 [US2] Persist override rationale + scoring snapshots in `src/GridPulse.Infrastructure/Repositories/EfDispatchRepository.cs` and surface them via DTOs for audit timelines.
 
 **Checkpoint**: Dispatch workspace independently testable once telemetry + operator features are in place.
 

@@ -76,6 +76,26 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
         return tickets;
     }
 
+    public async Task<Ticket?> GetByAssignedCrewIdAsync(Guid crewId, CancellationToken cancellationToken = default)
+    {
+        if (crewId == Guid.Empty)
+        {
+            throw new ArgumentException("Crew identifier is required.", nameof(crewId));
+        }
+
+        var ticket = await dbContext.Tickets
+            .AsSplitQuery()
+            .Include(ticket => ticket.Events)
+            .Include(ticket => ticket.Recommendations)
+                .ThenInclude(recommendation => recommendation.Crew)
+            .Where(ticket => ticket.AssignedCrewId == crewId)
+            .OrderByDescending(ticket => ticket.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return ticket;
+    }
+
     public async Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);

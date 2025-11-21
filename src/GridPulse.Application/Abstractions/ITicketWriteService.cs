@@ -12,4 +12,6 @@ public interface ITicketWriteService
     Task<Ticket> UpdateStatusAsync(Guid ticketId, TicketStatusUpdateRequest request, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<Ticket>> DetectPotentialDuplicatesAsync(TicketCreateRequest request, CancellationToken cancellationToken = default);
+
+    Task<Ticket> ApplyCrewStatusAsync(Guid ticketId, CrewStatusUpdateRequest request, CancellationToken cancellationToken = default);
 }

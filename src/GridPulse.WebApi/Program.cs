@@ -98,6 +98,7 @@ outagesGroup.MapGet(
     .WithName("GetOutageById");
 
 app.MapTicketsEndpoints();
+app.MapDispatchEndpoints();
 
 await app.Services.InitializeDatabaseAsync();
 

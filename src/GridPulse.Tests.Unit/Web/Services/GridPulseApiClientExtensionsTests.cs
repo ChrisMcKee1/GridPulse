@@ -91,6 +91,76 @@ public class GridPulseApiClientExtensionsTests
         result.Id.Should().Be(expectedTicket.Id);
     }
 
+    [Fact]
+    public async Task GetRecommendationsAsync_SendsTicketQuery()
+    {
+        var handler = new StubHttpMessageHandler();
+        var ticketId = Guid.NewGuid();
+        var expectedEnvelope = CreateRecommendationsEnvelope(ticketId);
+        handler.ResponseFactory = _ => BuildJsonResponse(expectedEnvelope);
+        var apiClient = CreateClient(handler);
+
+        var result = await apiClient.GetRecommendationsAsync(ticketId);
+
+        handler.LastRequest.Should().NotBeNull();
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Get);
+        handler.LastRequest.RequestUri.Should().Be(new Uri($"https://localhost/api/dispatch/recommendations?ticketId={ticketId:D}"));
+        result.Ticket.Id.Should().Be(ticketId);
+        result.Recommendations.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task PublishAssignmentAsync_SendsPostRequest()
+    {
+        var handler = new StubHttpMessageHandler();
+        var expectedReceipt = new AssignmentReceiptDto(Guid.NewGuid(), Guid.NewGuid(), "queued", "trk-123");
+        handler.ResponseFactory = _ => BuildJsonResponse(expectedReceipt, HttpStatusCode.Accepted);
+        var apiClient = CreateClient(handler);
+
+        var request = new DispatchAssignmentRequest
+        {
+            TicketId = expectedReceipt.TicketId,
+            CrewId = expectedReceipt.CrewId,
+            OverrideReason = "Crew closer to outage",
+            NotifyCrewChannels = new[] { "push" }
+        };
+
+        var receipt = await apiClient.PublishAssignmentAsync(request);
+
+        handler.LastRequest.Should().NotBeNull();
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
+        handler.LastRequest.RequestUri.Should().Be(new Uri("https://localhost/api/dispatch/assignments"));
+        var payload = await handler.LastRequest.Content!.ReadAsStringAsync();
+        payload.Should().Contain($"\"ticketId\":\"{expectedReceipt.TicketId:D}\"");
+        receipt.Should().Be(expectedReceipt);
+    }
+
+    [Fact]
+    public async Task PostCrewStatusAsync_SendsCrewStatusPayload()
+    {
+        var handler = new StubHttpMessageHandler();
+        var crewId = Guid.NewGuid();
+        var expectedResponse = new CrewStatusUpdateResponse(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        handler.ResponseFactory = _ => BuildJsonResponse(expectedResponse, HttpStatusCode.Accepted);
+        var apiClient = CreateClient(handler);
+
+        var request = new CrewStatusUpdateRequest
+        {
+            Status = CrewStatus.EnRoute,
+            Note = "Departing ops center",
+            Location = new CrewLocationSnapshotDto(35.22m, -80.84m, DateTimeOffset.UtcNow, 40)
+        };
+
+        var response = await apiClient.PostCrewStatusAsync(crewId, request);
+
+        handler.LastRequest.Should().NotBeNull();
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
+        handler.LastRequest.RequestUri.Should().Be(new Uri($"https://localhost/api/crews/{crewId:D}/status"));
+        var payload = await handler.LastRequest.Content!.ReadAsStringAsync();
+        payload.Should().Contain("\"status\":\"EnRoute\"");
+        response.Should().Be(expectedResponse);
+    }
+
     private static GridPulseApiClient CreateClient(StubHttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler)
@@ -128,6 +198,45 @@ public class GridPulseApiClientExtensionsTests
             null,
             Array.Empty<AssignmentEventDto>(),
             Array.Empty<DispatchRecommendationDto>());
+    }
+
+    private static DispatchRecommendationsEnvelope CreateRecommendationsEnvelope(Guid ticketId)
+    {
+        var crewId = Guid.NewGuid();
+        var ticket = new TicketSummaryDto(
+            ticketId,
+            "Transformer fire",
+            TicketPriority.High,
+            TicketStatus.InProgress,
+            DateTimeOffset.UtcNow.AddHours(-1),
+            120,
+            crewId,
+            "Crew Bravo");
+
+        var crewStatus = new CrewStatusDto(
+            crewId,
+            "Crew Bravo",
+            CrewStatus.Assigned,
+            1,
+            new[] { CrewSkill.Transformer },
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            new CrewLocationSnapshotDto(35.22m, -80.84m, DateTimeOffset.UtcNow.AddMinutes(-2), 38),
+            false);
+
+        var recommendation = new DispatchRecommendationDto(
+            Guid.NewGuid(),
+            ticketId,
+            crewStatus,
+            0.92,
+            new Dictionary<string, double> { { "distance", 0.4 }, { "skill", 0.3 }, { "workload", 0.22 } },
+            18,
+            true,
+            false,
+            null,
+            DateTimeOffset.UtcNow,
+            null);
+
+        return new DispatchRecommendationsEnvelope(ticket, new[] { recommendation });
     }
 
     private static JsonSerializerOptions CreateSerializerOptions()
