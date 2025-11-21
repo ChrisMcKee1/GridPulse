@@ -38,6 +38,7 @@ aspire run --project ./src/GridPulse.AppHost/GridPulse.AppHost.csproj
 - Blazor UI served from `https://localhost:7210` (actual port shown in CLI output via `WithReference(api)`).
 - Ensure ServiceDefaults dashboard displays new meters: `ticketing.automation`, `dispatch.recommendation`, `crew.delivery`.
 - Confirm the header badge shows the mock signed-in persona ("Auto Operator"); this verifies the placeholder identity is wired before real Entra integration.
+- When debugging the API outside Aspire (`dotnet run --project src/GridPulse.WebApi/GridPulse.WebApi.csproj --launch-profile https`), the browser now opens Scalar automatically because `launchSettings.json` sets `launchUrl` to `/scalar/v1`.
 
 ## 4. Operator Flow (UI)
 
@@ -56,9 +57,9 @@ aspire run --project ./src/GridPulse.AppHost/GridPulse.AppHost.csproj
 
 ## 6. Crew Simulation
 
-1. Use the temporary **Crew Simulator** panel (or REST client) to POST to `/api/crews/{crewId}/status` with payloads from `contracts/openapi.yaml`.
-2. Post `{"status":"acknowledged"}` and confirm dispatcher board timeline updates.
-3. Post `{"status":"completed"}` to trigger ticket transition to `Resolved`; operator must close to finalize.
+1. Use either the **Crew Status** panel on the Dispatch Board (preferred for demo) or REST client to POST to `/api/crews/{crewId}/status` with payloads from `contracts/openapi.yaml`.
+2. Post `{ "status": "acknowledged" }` and confirm dispatcher board timeline + crew badge update.
+3. Post `{ "status": "completed" }` to trigger ticket transition to `Resolved`; operator must close to finalize.
 
 ## 7. Testing Checklist
 
@@ -76,3 +77,4 @@ aspire run --project ./src/GridPulse.AppHost/GridPulse.AppHost.csproj
 
 - After verifying locally, capture screenshots or Playwright video for PR evidence per UI constitution.
 - Update `docs/ui-components.md` and `docs/api.md` with any user-facing changes made while implementing this plan.
+- Regenerate `specs/001-ticket-dispatch/contracts/openapi.yaml` after contract changes: `dotnet openapi add GridPulse.WebApi --uri https://localhost:7143/openapi/v1.json --output specs/001-ticket-dispatch/contracts/openapi.yaml` (use `dotnet openapi remove` first if entry exists).

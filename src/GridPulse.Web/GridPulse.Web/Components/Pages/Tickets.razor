@@ -1,13 +1,16 @@
 @page "/tickets"
+@rendermode InteractiveAuto
 @using System.Collections.Generic
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
 @using GridPulse.Application.Models
 @using GridPulse.Domain.Enums
 @using GridPulse.Web.Services
+@using Microsoft.Extensions.Logging
 @using Radzen
 @inject GridPulseApiClient ApiClient
 @inject NotificationService NotificationService
+@inject ILogger<Tickets> Logger
 @implements IDisposable
 
 <RadzenStack Gap="16px" class="tickets-page">
@@ -18,8 +21,8 @@
 		</div>
 
 		<RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-			<RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="async () => await LoadTicketsAsync()" Disabled="@isLoading">Refresh</RadzenButton>
-			<RadzenButton Icon="add_circle" ButtonStyle="ButtonStyle.Primary" Click="ToggleCreatePanel">@("New Ticket")</RadzenButton>
+			<RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="async () => await LoadTicketsAsync()" Disabled="@isLoading" data-testid="tickets-refresh">Refresh</RadzenButton>
+			<RadzenButton Icon="add_circle" ButtonStyle="ButtonStyle.Primary" Click="ToggleCreatePanel" data-testid="tickets-new">@( "New Ticket")</RadzenButton>
 		</RadzenStack>
 	</RadzenStack>
 
@@ -69,8 +72,8 @@
 					<RadzenTextArea @bind-Value="createModel.Description" Rows="3" Placeholder="Notes for dispatchers" Style="width:100%" />
 					<RadzenTextBox @bind-Value="createModel.AssetsInput" Placeholder="Affected assets (comma separated)" Style="width:100%" />
 					<RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-						<RadzenButton ButtonType="ButtonType.Submit" Icon="check" Disabled="@isSavingTicket">@(isSavingTicket ? "Creating..." : "Create ticket")</RadzenButton>
-						<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CancelCreatePanel" Disabled="@isSavingTicket">Cancel</RadzenButton>
+						<RadzenButton ButtonType="ButtonType.Submit" Icon="check" Disabled="@isSavingTicket" data-testid="tickets-create-submit">@(isSavingTicket ? "Creating..." : "Create ticket")</RadzenButton>
+						<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CancelCreatePanel" Disabled="@isSavingTicket" data-testid="tickets-create-cancel">Cancel</RadzenButton>
 					</RadzenStack>
 				</RadzenStack>
 			</RadzenTemplateForm>
@@ -171,7 +174,7 @@
 								  Click="PromoteTicketAsync">
 						@(isUpdatingStatus ? "Updating..." : GetPromoteLabel())
 					</RadzenButton>
-					<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="undo" Disabled="@isUpdatingStatus" Click="ResetSelection">Reset selection</RadzenButton>
+					<RadzenButton ButtonStyle="ButtonStyle.Light" Icon="undo" Disabled="@isUpdatingStatus" Click="ResetSelection" data-testid="tickets-reset-selection">Reset selection</RadzenButton>
 				</RadzenStack>
 
 				<TicketTimeline Events="selectedTicket.Events" />
@@ -234,7 +237,8 @@
 
 		try
 		{
-			var result = await ApiClient.GetTicketsAsync(filter, loadCts.Token).ConfigureAwait(false);
+			Logger.LogInformation("Loading tickets with filter {@Filter} (preferredSelectionId={PreferredSelectionId})", filter, preferredSelectionId);
+			var result = await ApiClient.GetTicketsAsync(filter, loadCts.Token);
 			tickets = result.Items
 				.OrderByDescending(ticket => ticket.UpdatedAt)
 				.ToArray();
@@ -246,31 +250,37 @@
 		}
 		catch (OperationCanceledException)
 		{
-			// swallow cancellation triggered by filter changes
+			Logger.LogDebug("Ticket load canceled due to filter change or disposal");
 		}
 		catch (Exception ex)
 		{
 			errorMessage = $"Unable to load tickets: {ex.Message}";
+			Logger.LogError(ex, "Failed to load tickets");
 		}
 		finally
 		{
 			isLoading = false;
+			Logger.LogInformation("Ticket load complete (count={TicketCount}, selected={SelectedId})", tickets.Count, selectedTicket?.Id);
 			await InvokeAsync(StateHasChanged);
 		}
 	}
 
 	private async Task ApplyFiltersAsync()
 	{
+		Logger.LogInformation("Applying ticket filters: statuses={Statuses}, minPriority={MinPriority}, includeTimeline={IncludeTimeline}, includeRecommendations={IncludeRecommendations}",
+			StatusFilter?.ToArray(), minPriority, includeTimeline, includeRecommendations);
 		await LoadTicketsAsync();
 	}
 
 	private void OnTicketSelected(TicketDto ticket)
 	{
 		selectedTicket = ticket;
+		Logger.LogInformation("Ticket selected {TicketId}", ticket.Id);
 	}
 
 	private void ToggleCreatePanel()
 	{
+		Logger.LogInformation("Toggling create ticket panel (open={State})", !isCreatePanelOpen);
 		isCreatePanelOpen = !isCreatePanelOpen;
 		if (isCreatePanelOpen)
 		{
@@ -280,6 +290,7 @@
 
 	private void CancelCreatePanel()
 	{
+		Logger.LogInformation("Create ticket panel canceled");
 		isCreatePanelOpen = false;
 		createModel = TicketCreateFormModel.CreateDefault();
 	}
@@ -288,6 +299,7 @@
 	{
 		if (isSavingTicket)
 		{
+			Logger.LogWarning("Create ticket requested while previous submission still in-flight");
 			return;
 		}
 
@@ -305,8 +317,10 @@
 				AffectedAssets = ParseAssets(createModel.AssetsInput)
 			};
 
-			var created = await ApiClient.CreateTicketAsync(request).ConfigureAwait(false);
+			Logger.LogInformation("Submitting ticket create request for outage {OutageReference} with priority {Priority}", request.OutageReferenceId, request.Priority);
+			var created = await ApiClient.CreateTicketAsync(request);
 			await LoadTicketsAsync(created.Id);
+			Logger.LogInformation("Ticket created {TicketId}", created.Id);
 			NotificationService.Notify(Radzen.NotificationSeverity.Success, "Ticket created", $"{created.Title} is now in {created.Status} state.");
 			isCreatePanelOpen = false;
 			createModel = TicketCreateFormModel.CreateDefault();
@@ -314,6 +328,7 @@
 		catch (Exception ex)
 		{
 			NotificationService.Notify(Radzen.NotificationSeverity.Error, "Failed to create ticket", ex.Message);
+			Logger.LogError(ex, "Ticket creation failed");
 		}
 		finally
 		{
@@ -332,10 +347,12 @@
 		var nextStatus = GetNextStatus(selectedTicket.Status);
 		if (nextStatus is null)
 		{
+			Logger.LogWarning("Promote requested but no next status for ticket {TicketId} in status {Status}", selectedTicket.Id, selectedTicket.Status);
 			return;
 		}
 
 		isUpdatingStatus = true;
+		Logger.LogInformation("Promoting ticket {TicketId} from {CurrentStatus} to {NextStatus}", selectedTicket.Id, selectedTicket.Status, nextStatus);
 
 		try
 		{
@@ -344,14 +361,16 @@
 				Status = nextStatus.Value
 			};
 
-			var updated = await ApiClient.UpdateTicketStatusAsync(selectedTicket.Id, request).ConfigureAwait(false);
+			var updated = await ApiClient.UpdateTicketStatusAsync(selectedTicket.Id, request);
 			UpsertTicket(updated);
 			selectedTicket = updated;
 			NotificationService.Notify(Radzen.NotificationSeverity.Success, "Ticket updated", $"Status moved to {updated.Status}.");
+			Logger.LogInformation("Ticket {TicketId} promoted to {Status}", updated.Id, updated.Status);
 		}
 		catch (Exception ex)
 		{
 			NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unable to update ticket", ex.Message);
+			Logger.LogError(ex, "Ticket promotion failed for {TicketId}", selectedTicket.Id);
 		}
 		finally
 		{
@@ -393,6 +412,7 @@
 	private void ResetSelection()
 	{
 		selectedTicket = tickets.FirstOrDefault();
+		Logger.LogInformation("Ticket selection reset to first ticket {TicketId}", selectedTicket?.Id);
 	}
 
 	private bool ShowDuplicateWarning(TicketDto ticket) => ticket.Events.Any(evt => evt.EventType == AssignmentEventType.TicketDuplicateFlag);

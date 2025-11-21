@@ -32,24 +32,29 @@ internal static class JsonColumnHelpers
     internal static ValueComparer<ICollection<T>> CreateCollectionComparer<T>()
     {
         return new ValueComparer<ICollection<T>>(
-            (left, right) => CollectionsEqual(left, right),
-            collection => GetCollectionHashCode(collection),
-            collection => collection.ToList());
+            (left, right) => CollectionsEqual(NormalizeCollection(left), NormalizeCollection(right)),
+            collection => GetCollectionHashCode(NormalizeCollection(collection)),
+            collection => SnapshotCollection(NormalizeCollection(collection)));
     }
 
     internal static ValueComparer<IDictionary<string, TValue>> CreateDictionaryComparer<TValue>()
     {
         return new ValueComparer<IDictionary<string, TValue>>(
-            (left, right) => DictionariesEqual(left, right),
-            dictionary => GetDictionaryHashCode(dictionary),
-            dictionary => new Dictionary<string, TValue>(dictionary, StringComparer.OrdinalIgnoreCase));
+            (left, right) => DictionariesEqual(NormalizeDictionary(left), NormalizeDictionary(right)),
+            dictionary => GetDictionaryHashCode(NormalizeDictionary(dictionary)),
+            dictionary => SnapshotDictionary(NormalizeDictionary(dictionary)));
     }
 
-    private static bool CollectionsEqual<T>(ICollection<T> left, ICollection<T> right)
+    private static bool CollectionsEqual<T>(ICollection<T>? left, ICollection<T>? right)
     {
         if (ReferenceEquals(left, right))
         {
             return true;
+        }
+
+        if (left is null || right is null)
+        {
+            return false;
         }
 
         if (left.Count != right.Count)
@@ -71,8 +76,13 @@ internal static class JsonColumnHelpers
         return true;
     }
 
-    private static int GetCollectionHashCode<T>(IEnumerable<T> collection)
+    private static int GetCollectionHashCode<T>(IEnumerable<T>? collection)
     {
+        if (collection is null)
+        {
+            return 0;
+        }
+
         var hash = new HashCode();
         foreach (var item in collection)
         {
@@ -82,11 +92,16 @@ internal static class JsonColumnHelpers
         return hash.ToHashCode();
     }
 
-    private static bool DictionariesEqual<TValue>(IDictionary<string, TValue> left, IDictionary<string, TValue> right)
+    private static bool DictionariesEqual<TValue>(IDictionary<string, TValue>? left, IDictionary<string, TValue>? right)
     {
         if (ReferenceEquals(left, right))
         {
             return true;
+        }
+
+        if (left is null || right is null)
+        {
+            return false;
         }
 
         if (left.Count != right.Count)
@@ -110,8 +125,13 @@ internal static class JsonColumnHelpers
         return true;
     }
 
-    private static int GetDictionaryHashCode<TValue>(IDictionary<string, TValue> dictionary)
+    private static int GetDictionaryHashCode<TValue>(IDictionary<string, TValue>? dictionary)
     {
+        if (dictionary is null)
+        {
+            return 0;
+        }
+
         var hash = new HashCode();
         foreach (var pair in dictionary.OrderBy(static kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
@@ -120,5 +140,25 @@ internal static class JsonColumnHelpers
         }
 
         return hash.ToHashCode();
+    }
+
+    private static ICollection<T> SnapshotCollection<T>(ICollection<T> source)
+    {
+        return source.ToList();
+    }
+
+    private static IDictionary<string, TValue> SnapshotDictionary<TValue>(IDictionary<string, TValue> source)
+    {
+        return new Dictionary<string, TValue>(source, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static ICollection<T> NormalizeCollection<T>(ICollection<T>? source)
+    {
+        return source ?? Array.Empty<T>();
+    }
+
+    private static IDictionary<string, TValue> NormalizeDictionary<TValue>(IDictionary<string, TValue>? source)
+    {
+        return source ?? new Dictionary<string, TValue>(StringComparer.OrdinalIgnoreCase);
     }
 }

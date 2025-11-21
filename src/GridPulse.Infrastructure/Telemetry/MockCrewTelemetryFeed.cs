@@ -75,10 +75,16 @@ internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedM
         await EnsureStartingPositionsAsync(dispatchRepository, crews, cancellationToken).ConfigureAwait(false);
 
         var snapshots = new List<CrewLocationSnapshot>(crews.Count);
+        var staleThresholdSeconds = (int)Math.Max(_cadence.TotalSeconds * 2, 60);
+        var maxSignalAge = Math.Max(staleThresholdSeconds + 60, (int)Math.Ceiling(_cadence.TotalSeconds * 4));
+        var producedStaleSample = false;
+
         foreach (var crew in crews)
         {
             var position = NextPosition(crew.Id);
-            var signalAge = Random.Shared.Next(0, (int)Math.Max(30, _cadence.TotalSeconds * 2));
+            var signalAge = Random.Shared.Next(0, maxSignalAge);
+            var isStale = signalAge >= staleThresholdSeconds;
+            producedStaleSample |= isStale;
             var now = DateTimeOffset.UtcNow;
             snapshots.Add(new CrewLocationSnapshot
             {
@@ -88,9 +94,25 @@ internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedM
                 Longitude = position.Longitude,
                 CapturedAt = now,
                 SignalAgeSeconds = signalAge,
-                IsStale = signalAge > _cadence.TotalSeconds * 2,
+                IsStale = isStale,
                 SpeedMph = Math.Round(Random.Shared.NextDouble() * 55, 2)
             });
+        }
+
+        if (!producedStaleSample && snapshots.Count > 0)
+        {
+            var fallback = snapshots[0];
+            snapshots[0] = new CrewLocationSnapshot
+            {
+                Id = Guid.NewGuid(),
+                CrewId = fallback.CrewId,
+                Latitude = fallback.Latitude,
+                Longitude = fallback.Longitude,
+                CapturedAt = fallback.CapturedAt,
+                SignalAgeSeconds = staleThresholdSeconds + 30,
+                IsStale = true,
+                SpeedMph = fallback.SpeedMph
+            };
         }
 
         await dispatchRepository.AddLocationSnapshotsAsync(snapshots, cancellationToken).ConfigureAwait(false);

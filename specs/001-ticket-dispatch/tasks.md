@@ -119,8 +119,8 @@ description: "Task list for Ticket Management & Dispatch Optimization"
 
 **Purpose**: Final hardening, docs, and verification across the entire feature.
 
-- [ ] T037 [P] Update documentation (`docs/api.md`, `docs/ui-components.md`, `specs/001-ticket-dispatch/quickstart.md`) with new endpoints, UI flows, and telemetry notes.
-- [ ] T038 [P] Regenerate and publish OpenAPI + Scalar docs to include new schemas/endpoints by integrating `specs/001-ticket-dispatch/contracts/openapi.yaml` into `GridPulse.WebApi`.
+- [x] T037 [P] Update documentation (`docs/api.md`, `docs/ui-components.md`, `specs/001-ticket-dispatch/quickstart.md`) with new endpoints, UI flows, and telemetry notes.
+- [x] T038 [P] Regenerate and publish OpenAPI + Scalar docs to include new schemas/endpoints by integrating `specs/001-ticket-dispatch/contracts/openapi.yaml` into `GridPulse.WebApi`.
 - [ ] T039 [P] Run full regression suite: `dotnet test GridPulse.Tests.Unit`, `tests/GridPulse.Web.Tests.Playwright`, and `aspire run` smoke per quickstart to ensure E2E readiness.
 - [ ] T040 Final observability + resilience review: confirm ServiceDefaults meters, health endpoints, and dashboards capture ticketing/dispatch KPIs before hand-off.
 

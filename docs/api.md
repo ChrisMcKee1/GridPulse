@@ -203,6 +203,215 @@ curl -X GET https://localhost:7143/api/outages/17aa5a0f-4f5f-45ec-8dc0-1b53e876c
 
 ---
 
+### Ticket Management
+
+Ticket endpoints power the operator workspace (`src/GridPulse.Web/GridPulse.Web/Components/Pages/Tickets.razor`). All handlers return DTOs defined in `GridPulse.Application.Models` and follow ProblemDetails for validation failures.
+
+#### Create Ticket
+
+```http
+POST /api/tickets
+```
+
+##### Ticket Request Body
+
+```json
+{
+  "title": "Transformer fire near Elm",
+  "outageReferenceId": "OUT-1099",
+  "description": "Reported by AMI sensor",
+  "priority": "High",
+  "customerImpact": 75,
+  "affectedAssets": ["TX-442", "CB-10"]
+}
+```
+
+##### Ticket Responses
+
+- `201 Created` → `TicketDto` payload for the new ticket
+- `400 Bad Request` → Validation error (missing title, >20 assets, duplicated outage reference)
+- `409 Conflict` → Duplicate open ticket detected via outage reference
+
+#### Query Tickets
+
+```http
+GET /api/tickets?statuses=Open,InProgress&minPriority=High&includeTimeline=true&includeRecommendations=true
+```
+
+##### Ticket Query Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `statuses` | CSV of `TicketStatus` | Optional filter (defaults to Open + InProgress) |
+| `minPriority` | `TicketPriority` | Minimum severity to return |
+| `includeTimeline` | `bool` | Include `AssignmentEventDto` timeline entries |
+| `includeRecommendations` | `bool` | Include dispatch recommendations |
+
+##### Ticket Query Response
+
+```json
+{
+  "items": [
+    {
+      "id": "a065612f-283c-4577-ab91-c144a92dff2d",
+      "title": "Feeder fault – Substation 12",
+      "status": "InProgress",
+      "priority": "High",
+      "customerImpact": 120,
+      "etaMinutes": 45,
+      "assignedCrewId": "372551b7-cddc-4586-ad40-f430b6cf5352",
+      "assignedCrewName": "Crew Delta",
+      "affectedAssets": ["FD-12"],
+      "openedAt": "2025-11-20T23:01:02.431Z",
+      "updatedAt": "2025-11-21T02:31:38.925Z",
+      "events": [...],
+      "recommendations": [...]
+    }
+  ]
+}
+```
+
+#### Update Ticket Status
+
+```http
+PATCH /api/tickets/{ticketId}/status
+```
+
+##### Ticket Status Payload
+
+```json
+{
+  "status": "Resolved",
+  "reason": "Crew reported completed field work"
+}
+```
+
+##### Ticket Status Responses
+
+- `200 OK` → Updated `TicketDto`
+- `400 Bad Request` → Invalid payload or missing reason for cancellation
+- `404 Not Found` → Ticket ID unknown
+- `409 Conflict` → Workflow violation (e.g., Closed → InProgress)
+
+---
+
+### Dispatch Operations
+
+Dispatch endpoints feed `DispatchBoard.razor` with recommendation data and post assignments to the automation worker.
+
+#### Get Recommendations
+
+```http
+GET /api/dispatch/recommendations?ticketId={guid}
+```
+
+##### Recommendation Responses
+
+- `200 OK` → `DispatchRecommendationsEnvelope` containing ticket summary plus ordered crew list
+- `400 Bad Request` → Missing `ticketId`
+- `404 Not Found` → Ticket not in a dispatchable state
+
+Example payload:
+
+```json
+{
+  "ticket": {
+    "id": "5f3c6d45-d5ea-4b75-9a39-5b7db9a19e96",
+    "title": "Pole fire",
+    "priority": "High"
+  },
+  "recommendations": [
+    {
+      "id": "8f892c9a-5d0b-4b04-92e5-16b2ac9ce836",
+      "ticketId": "5f3c6d45-d5ea-4b75-9a39-5b7db9a19e96",
+      "crew": {
+        "crewId": "9994df1e-52e7-4c21-9114-9ba43a2f9203",
+        "displayName": "Crew Bravo",
+        "status": "Assigned",
+        "currentTicketCount": 1,
+        "skills": ["Transformer"],
+        "lastStatusUpdate": "2025-11-21T02:15:00Z",
+        "location": {
+          "latitude": 33.12,
+          "longitude": -96.81,
+          "capturedAt": "2025-11-21T02:14:30Z",
+          "speedMph": 42
+        },
+        "isTelemetryStale": false
+      },
+      "compositeScore": 0.92,
+      "scoreComponents": {
+        "distance": 0.48,
+        "skill": 0.30,
+        "workload": 0.14
+      },
+      "etaMinutes": 32,
+      "isAutoSelected": true,
+      "isOverride": false,
+      "createdAt": "2025-11-21T02:16:45.112Z"
+    }
+  ]
+}
+```
+
+#### Publish Assignment
+
+```http
+POST /api/dispatch/assignments
+```
+
+##### Assignment Request Body
+
+```json
+{
+  "ticketId": "5f3c6d45-d5ea-4b75-9a39-5b7db9a19e96",
+  "crewId": "9994df1e-52e7-4c21-9114-9ba43a2f9203",
+  "overrideReason": "Crew Alpha diverted for hospital outage"
+}
+```
+
+##### Assignment Responses
+
+- `202 Accepted` → `AssignmentReceiptDto` (`trackingId`, `deliveryStatus`)
+- `400 Bad Request` → Missing identifiers or override details when required
+- `404 Not Found` → Ticket/crew not found
+- `409 Conflict` → Recommendation expired or telemetry stale
+
+---
+
+### Crew Status Updates
+
+Crew simulators (and eventually the mobile app) call this endpoint to acknowledge assignments or report progress. Updates flow through `DispatchAssignmentService`, update the ticket timeline, and can close tickets automatically when crews report completion.
+
+#### Update Crew Status
+
+```http
+POST /api/crews/{crewId}/status
+```
+
+##### Crew Status Payload
+
+```json
+{
+  "status": "acknowledged",
+  "note": "En route once refueled",
+  "location": {
+    "latitude": 33.10,
+    "longitude": -96.80,
+    "capturedAt": "2025-11-21T02:25:00Z",
+    "speedMph": 38
+  }
+}
+```
+
+##### Crew Status Responses
+
+- `202 Accepted` → `CrewStatusUpdateResponse` referencing the affected ticket
+- `400 Bad Request` → Missing crew ID or payload
+- `404 Not Found` → No active assignment for the crew
+
+---
+
 ## Data Models
 
 ### OutageSummary
@@ -235,10 +444,105 @@ enum OutageStatus {
 ```
 
 **Values**:
+
 - `Reported` - Initial state when outage is detected
 - `Acknowledged` - Outage confirmed by operator
 - `CrewDispatched` - Repair crew en route
 - `Restored` - Power fully restored
+
+### TicketDto
+
+```typescript
+interface TicketDto {
+  id: string;
+  title: string;
+  outageReferenceId: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  customerImpact: number;
+  etaMinutes: number | null;
+  assignedCrewId: string | null;
+  assignedCrewName: string | null;
+  affectedAssets: string[];
+  openedAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  events: AssignmentEventDto[];
+  recommendations: DispatchRecommendationDto[];
+}
+```
+
+### DispatchRecommendationDto
+
+```typescript
+interface DispatchRecommendationDto {
+  id: string;
+  ticketId: string;
+  crew: CrewStatusDto;
+  compositeScore: number;
+  scoreComponents: Record<string, number>;
+  etaMinutes: number;
+  isAutoSelected: boolean;
+  isOverride: boolean;
+  overrideReason: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+}
+```
+
+### CrewStatusDto
+
+```typescript
+interface CrewStatusDto {
+  crewId: string;
+  displayName: string;
+  status: CrewStatus;
+  currentTicketCount: number;
+  skills: CrewSkill[];
+  lastStatusUpdate: string;
+  location?: CrewLocationSnapshot;
+  isTelemetryStale: boolean;
+}
+```
+
+### AssignmentEventDto
+
+```typescript
+interface AssignmentEventDto {
+  id: string;
+  ticketId: string;
+  eventType: string;
+  createdAt: string;
+  createdBy: string;
+  note?: string;
+}
+```
+
+### CrewStatusUpdateRequest
+
+```typescript
+interface CrewStatusUpdateRequest {
+  status: CrewAssignmentStatus;
+  note?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    capturedAt: string;
+    speedMph?: number;
+  };
+}
+```
+
+### AssignmentReceiptDto
+
+```typescript
+interface AssignmentReceiptDto {
+  ticketId: string;
+  crewId: string;
+  deliveryStatus: string; // queued, acknowledged, completed
+  trackingId: string;
+}
+```
 
 ---
 
@@ -279,6 +583,7 @@ The API uses RFC 7807 Problem Details for error responses.
 ### Example Error Responses
 
 #### 404 Not Found
+
 ```json
 {
   "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
@@ -288,6 +593,7 @@ The API uses RFC 7807 Problem Details for error responses.
 ```
 
 #### 500 Internal Server Error
+
 ```json
 {
   "type": "https://tools.ietf.org/html/rfc9110#section-15.6.1",
@@ -344,21 +650,32 @@ The API provides interactive documentation using Scalar (replacement for Swagger
 **Availability**: Development environment only
 
 **Features**:
+
 - Interactive request testing
 - Schema documentation
 - Example requests and responses
 - Try-it-out functionality
 
+> **Tip**: Launching `GridPulse.WebApi` with the `https` profile now opens Scalar automatically (`launchUrl` points to `/scalar/v1`).
+
 ### OpenAPI Specification
 
-**URL**: `https://localhost:7143/openapi/v1.json`
+**Runtime URL**: `https://localhost:7143/openapi/v1.json`
 
-**Availability**: Development environment only
+**Contract Source**: `specs/001-ticket-dispatch/contracts/openapi.yaml`
 
 Download the OpenAPI specification for use with:
+
 - Code generation tools
 - API testing tools (Postman, Insomnia)
 - Documentation generators
+
+To refresh the spec file from a running API instance:
+
+```powershell
+dotnet openapi remove GridPulse.WebApi
+dotnet openapi add GridPulse.WebApi --uri https://localhost:7143/openapi/v1.json --output specs/001-ticket-dispatch/contracts/openapi.yaml
+```
 
 ---
 
@@ -383,6 +700,7 @@ Download the OpenAPI specification for use with:
 The following endpoints are planned but not yet implemented:
 
 ### Outage Write Operations
+
 ```http
 POST   /api/outages                    # Create new outage
 PUT    /api/outages/{id}               # Update outage
@@ -391,12 +709,14 @@ DELETE /api/outages/{id}               # Cancel outage
 ```
 
 ### Outage Events
+
 ```http
 GET    /api/outages/{id}/events        # List outage events
 POST   /api/outages/{id}/events        # Add event/note
 ```
 
 ### Customers
+
 ```http
 GET    /api/customers                  # List customers
 GET    /api/customers/{id}             # Get customer
@@ -405,6 +725,7 @@ PUT    /api/customers/{id}             # Update customer
 ```
 
 ### Service Locations
+
 ```http
 GET    /api/customers/{id}/locations   # List locations for customer
 GET    /api/locations/{id}             # Get location details
@@ -412,6 +733,7 @@ POST   /api/locations                  # Add service location
 ```
 
 ### Usage Readings
+
 ```http
 GET    /api/locations/{id}/usage       # Get usage history
 GET    /api/locations/{id}/usage/latest # Get latest reading
@@ -419,6 +741,7 @@ POST   /api/locations/{id}/usage       # Record new reading
 ```
 
 ### Notifications
+
 ```http
 GET    /api/customers/{id}/preferences # Get notification preferences
 PUT    /api/customers/{id}/preferences # Update preferences
@@ -450,6 +773,7 @@ public sealed class GridPulseApiClient(HttpClient httpClient)
 ```
 
 **Configuration**:
+
 ```json
 {
   "Api": {
@@ -537,11 +861,13 @@ GET {{GridPulse_WebApi_HostAddress}}/api/outages/17aa5a0f-4f5f-45ec-8dc0-1b53e87
 ## Performance Considerations
 
 ### Current Implementation
+
 - In-memory data store (extremely fast)
 - No caching layer
 - Synchronous response generation
 
 ### Future Optimizations
+
 - Response caching for frequently accessed data
 - Database connection pooling
 - Pagination for large result sets
@@ -566,6 +892,7 @@ When consuming the API:
 ## Support and Feedback
 
 For API issues or questions:
+
 - Check the [Scalar documentation](https://localhost:7143/scalar/v1) for interactive examples
 - Review the [OpenAPI specification](https://localhost:7143/openapi/v1.json)
 - See the [Architecture documentation](architecture.md) for system design

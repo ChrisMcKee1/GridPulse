@@ -21,11 +21,10 @@ public static class GridPulseApiClientExtensions
         ArgumentNullException.ThrowIfNull(request);
 
         var response = await client.HttpClient
-            .PostAsJsonAsync("api/tickets", request, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .PostAsJsonAsync("api/tickets", request, SerializerOptions, cancellationToken);
 
         response.EnsureSuccessStatusCode();
-        return await DeserializeAsync<TicketDto>(response.Content, cancellationToken).ConfigureAwait(false);
+        return await DeserializeAsync<TicketDto>(response.Content, cancellationToken);
     }
 
     public static async Task<PagedResult<TicketDto>> GetTicketsAsync(
@@ -39,8 +38,7 @@ public static class GridPulseApiClientExtensions
         var endpoint = string.IsNullOrEmpty(query) ? "api/tickets" : $"api/tickets{query}";
 
         var result = await client.HttpClient
-            .GetFromJsonAsync<PagedResult<TicketDto>>(endpoint, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .GetFromJsonAsync<PagedResult<TicketDto>>(endpoint, SerializerOptions, cancellationToken);
 
         return result ?? new PagedResult<TicketDto>(Array.Empty<TicketDto>(), 0);
     }
@@ -60,11 +58,10 @@ public static class GridPulseApiClientExtensions
         }
 
         var response = await client.HttpClient
-            .PatchAsJsonAsync($"api/tickets/{ticketId:D}/status", request, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .PatchAsJsonAsync($"api/tickets/{ticketId:D}/status", request, SerializerOptions, cancellationToken);
 
         response.EnsureSuccessStatusCode();
-        return await DeserializeAsync<TicketDto>(response.Content, cancellationToken).ConfigureAwait(false);
+        return await DeserializeAsync<TicketDto>(response.Content, cancellationToken);
     }
 
     public static async Task<DispatchRecommendationsEnvelope> GetRecommendationsAsync(
@@ -81,8 +78,7 @@ public static class GridPulseApiClientExtensions
 
         var endpoint = $"api/dispatch/recommendations?ticketId={ticketId:D}";
         var envelope = await client.HttpClient
-            .GetFromJsonAsync<DispatchRecommendationsEnvelope>(endpoint, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .GetFromJsonAsync<DispatchRecommendationsEnvelope>(endpoint, SerializerOptions, cancellationToken);
 
         return envelope ?? throw new InvalidOperationException("Dispatch recommendations could not be retrieved from the API.");
     }
@@ -106,11 +102,10 @@ public static class GridPulseApiClientExtensions
         }
 
         var response = await client.HttpClient
-            .PostAsJsonAsync("api/dispatch/assignments", request, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .PostAsJsonAsync("api/dispatch/assignments", request, SerializerOptions, cancellationToken);
 
         response.EnsureSuccessStatusCode();
-        return await DeserializeAsync<AssignmentReceiptDto>(response.Content, cancellationToken).ConfigureAwait(false);
+        return await DeserializeAsync<AssignmentReceiptDto>(response.Content, cancellationToken);
     }
 
     public static async Task<CrewStatusUpdateResponse> PostCrewStatusAsync(
@@ -128,11 +123,10 @@ public static class GridPulseApiClientExtensions
         }
 
         var response = await client.HttpClient
-            .PostAsJsonAsync($"api/crews/{crewId:D}/status", request, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .PostAsJsonAsync($"api/crews/{crewId:D}/status", request, SerializerOptions, cancellationToken);
 
         response.EnsureSuccessStatusCode();
-        return await DeserializeAsync<CrewStatusUpdateResponse>(response.Content, cancellationToken).ConfigureAwait(false);
+        return await DeserializeAsync<CrewStatusUpdateResponse>(response.Content, cancellationToken);
     }
 
     private static string BuildTicketsQueryString(TicketFilter filter)
@@ -173,7 +167,7 @@ public static class GridPulseApiClientExtensions
 
     private static async Task<T> DeserializeAsync<T>(HttpContent content, CancellationToken cancellationToken)
     {
-        var result = await content.ReadFromJsonAsync<T>(SerializerOptions, cancellationToken).ConfigureAwait(false);
+        var result = await content.ReadFromJsonAsync<T>(SerializerOptions, cancellationToken);
         if (result is null)
         {
             throw new InvalidOperationException($"Unable to deserialize API response to type '{typeof(T).Name}'.");

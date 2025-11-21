@@ -9,7 +9,7 @@ namespace GridPulse.Tests.Unit.Web.Components;
 
 public sealed class TicketTimelineTests : ComponentTestBase
 {
-    [Fact(Skip = "Ticket timeline not implemented yet")] // T013
+    [Fact] // T013
     public void OrdersEventsDescendingByTime()
     {
         var events = new List<AssignmentEventDto>
@@ -25,7 +25,7 @@ public sealed class TicketTimelineTests : ComponentTestBase
         timeline.InnerHtml.Should().Contain("dispatcher");
     }
 
-    [Fact(Skip = "Ticket timeline not implemented yet")] // T013
+    [Fact] // T013
     public void HighlightsDuplicateFlags()
     {
         var events = new List<AssignmentEventDto>

@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD001 MD002 MD003 MD004 MD005 MD006 MD007 MD009 MD010 MD011 MD012 MD013 MD014 MD018 MD019 MD020 MD021 MD022 MD023 MD024 MD025 MD026 MD027 MD028 MD029 MD030 MD031 MD032 MD033 MD034 MD035 MD036 MD037 MD038 MD039 MD040 MD041 MD042 MD043 MD044 MD045 MD046 MD047 MD048 MD049 MD050 MD051 MD052 MD053 MD054 MD055 MD056 MD057 MD058 MD059 MD060 MD061 MD062 MD063 MD064 MD065 MD066 MD067 MD068 -->
+
 # UI Components Documentation
 
 Complete reference for GridPulse Blazor UI components, organized using Atomic Design principles.
@@ -295,6 +297,60 @@ public record OutageActivityItem(
 
 ---
 
+### TicketTimeline
+
+Timeline card summarizing ticket automation and crew events in reverse chronological order.
+
+**Location**: `GridPulse.Web/Components/Organisms/TicketTimeline.razor`
+
+**Purpose**: Provide operators/dispatchers a single place to review audit events, duplicate warnings, automation actions, and crew acknowledgements.
+
+**Parameters**:
+```csharp
+[Parameter] public IReadOnlyCollection<AssignmentEventDto> Events { get; set; } = Array.Empty<AssignmentEventDto>();
+```
+
+**Behavior**:
+- Orders events descending by `OccurredAt`
+- Applies visual variants (warning/success/info/danger/default) based on `AssignmentEventType`
+- Shows `StatusChip` per event with contextual title (e.g., “Crew acknowledged”)
+- Lists metadata such as actor and detail key/value pairs when provided
+- Displays Radzen info alert when no events exist
+
+**Testing Hooks**: `data-testid="ticket-timeline"` for Playwright/bUnit coverage
+
+---
+
+### CrewStatusPanel
+
+Interactive control surface for simulating crew acknowledgements/status transitions.
+
+**Location**: `GridPulse.Web/Components/Organisms/CrewStatusPanel.razor`
+
+**Purpose**: Monitor crew telemetry, surface SLA alerts, and emit status updates back to the API.
+
+**Parameters**:
+```csharp
+[Parameter] public CrewStatusDto? Crew { get; set; }
+[Parameter] public IReadOnlyCollection<AssignmentEventDto> Timeline { get; set; } = Array.Empty<AssignmentEventDto>();
+[Parameter] public bool IsSubmitting { get; set; }
+[Parameter] public EventCallback<CrewAssignmentStatus> StatusSubmitted { get; set; }
+```
+
+**Features**:
+- Header displays crew display name + current assignment status badge
+- Alert banner warns when acknowledgement is pending/overdue (>=5 minutes)
+- Details list highlights ticket count, skills, and last telemetry timestamp
+- Dropdown of all `CrewAssignmentStatus` values plus “Send update” CTA
+- Emits `StatusSubmitted` event (disabled while submitting to avoid duplicate posts)
+- Includes `data-testid` hooks for select, alert, and send button interactions
+
+**Accessibility**:
+- Alerts include `role="alert"`
+- Buttons and selects disabled when no crew bound or submission in-flight
+
+---
+
 ## Templates
 
 Page-level layout templates.
@@ -414,6 +470,70 @@ protected override async Task OnInitializedAsync()
 
 ---
 
+### Tickets
+
+Operator workspace for triaging outage-derived tickets, running duplicate detection, and promoting workflow states.
+
+**Location**: `GridPulse.Web/Components/Pages/Tickets.razor`  
+**Route**: `/tickets`
+
+**Key Features**:
+- Filter controls (status multi-select, priority dropdown, timeline/recommendation switches)
+- Inline create panel with validation + asset parsing helper
+- DataGrid with paging/sorting + `data-testid="tickets-grid"`
+- Detail card showing metadata, duplicate warnings, `TicketTimeline`, and promote/reset actions
+- Uses `GridPulseApiClient` for `GetTicketsAsync`, `CreateTicketAsync`, `UpdateTicketStatusAsync`
+
+**State Highlights**:
+```csharp
+private IEnumerable<TicketStatus> StatusFilter { get; set; } = new[] { TicketStatus.Open, TicketStatus.InProgress };
+private bool includeTimeline = true;
+private bool includeRecommendations;
+private IReadOnlyList<TicketDto> tickets = Array.Empty<TicketDto>();
+private TicketDto? selectedTicket;
+```
+
+**UX Considerations**:
+- Displays Radzen skeletons while fetching
+- Alerts for duplicate detection and load errors
+- `PromoteTicketAsync` enforces workflow guardrails via server-side validation
+- `TicketTimeline` reused to keep automation history consistent
+
+---
+
+### Dispatch Board
+
+Dispatcher-focused hub for reviewing recommendations, publishing assignments, and simulating crew acknowledgements.
+
+**Location**: `GridPulse.Web/Components/Pages/DispatchBoard.razor`  
+**Route**: `/dispatch`
+
+**Layout**:
+- Left column: ticket selector (priority-sorted) with skeleton fallback
+- Right column: recommendations grid, action buttons, `TicketTimeline`, `CrewStatusPanel`
+- Toast + dialog overlays for assignment receipts and override reasons
+
+**Data Flow**:
+```csharp
+private IReadOnlyList<TicketDto> dispatchableTickets = Array.Empty<TicketDto>();
+private IReadOnlyList<DispatchRecommendationDto> recommendations = Array.Empty<DispatchRecommendationDto>();
+private DispatchRecommendationDto? selectedRecommendation;
+private bool isPublishingAssignment;
+```
+
+**Interactions**:
+- Automatically refreshes recommendations via background loop (45 seconds)
+- Warns when telemetry is stale or override reason missing
+- `PublishAssignmentAsync` posts to `/api/dispatch/assignments` and surfaces receipt text
+- `CrewStatusPanel` binds to the currently active crew for the selected ticket
+
+**Accessibility**:
+- Ticket list buttons expose `aria-pressed`
+- Recommendation grid uses `role="table"` semantics
+- Crew status empty state uses descriptive text for assistive tech
+
+---
+
 ### Error
 
 Error page for unhandled exceptions.
@@ -448,8 +568,28 @@ Typed HTTP client for API communication.
 
 **Methods**:
 ```csharp
-public async Task<IReadOnlyList<OutageSummaryResponse>> GetRecentOutagesAsync(
-    CancellationToken cancellationToken = default)
+public Task<IReadOnlyList<OutageSummaryResponse>> GetRecentOutagesAsync(
+    CancellationToken cancellationToken = default);
+public Task<TicketCollectionResponse> GetTicketsAsync(
+    TicketFilter filter,
+    CancellationToken cancellationToken = default);
+public Task<TicketDto> CreateTicketAsync(
+    TicketCreateRequest request,
+    CancellationToken cancellationToken = default);
+public Task<TicketDto> UpdateTicketStatusAsync(
+    Guid ticketId,
+    TicketStatusUpdateRequest request,
+    CancellationToken cancellationToken = default);
+public Task<DispatchRecommendationsEnvelope> GetRecommendationsAsync(
+    Guid ticketId,
+    CancellationToken cancellationToken = default);
+public Task<AssignmentReceiptDto> PublishAssignmentAsync(
+    DispatchAssignmentRequest request,
+    CancellationToken cancellationToken = default);
+public Task<CrewStatusUpdateResponse> PostCrewStatusAsync(
+    Guid crewId,
+    CrewStatusUpdateRequest request,
+    CancellationToken cancellationToken = default);
 ```
 
 **Configuration**:
@@ -473,9 +613,10 @@ builder.Services.AddHttpClient<GridPulseApiClient>(client =>
 
 **Features**:
 - Configured base URL from appsettings
-- JSON deserialization
-- Null-safe (returns empty array on null)
-- Cancellation token support
+- JSON serialization with shared DTOs from `GridPulse.Application`
+- Null-safe helpers (tickets collection defaults to empty)
+- Cancellation token support and CTS resets inside pages
+- Centralized error handling for dispatch + crew flows
 
 ---
 
@@ -500,6 +641,39 @@ public sealed record OutageSummaryResponse(
 ```
 
 **Note**: Mirrors API `OutageSummary` but with string-based Status
+
+#### TicketDto (shared application model)
+
+**Namespace**: `GridPulse.Application.Models`
+
+Key properties surfaced in UI:
+- `Guid Id`, `string Title`, `TicketStatus Status`, `TicketPriority Priority`
+- `int CustomerImpact`, `Guid? AssignedCrewId`, `string? AssignedCrewName`
+- `IReadOnlyList<string> AffectedAssets`
+- `IReadOnlyCollection<AssignmentEventDto> Events`
+- `IReadOnlyCollection<DispatchRecommendationDto> Recommendations`
+
+#### DispatchRecommendationDto
+
+Represents ranked crew options emitted by automation.
+
+Fields consumed by Dispatch Board:
+- `CrewStatusDto Crew` (display name, skills, telemetry freshness)
+- `double CompositeScore` + `Dictionary<string, double> ScoreComponents`
+- `int EtaMinutes`
+- Flags: `IsAutoSelected`, `IsOverride`, `OverrideReason`
+
+#### AssignmentEventDto
+
+Timeline entries shared between ticket + dispatch screens.
+
+Important members: `AssignmentEventType EventType`, `DateTimeOffset OccurredAt`, `string Actor`, `Dictionary<string, string> Details`, `Guid? CrewId`.
+
+#### CrewStatusDto
+
+Bound to `CrewStatusPanel` and telemetry badges.
+
+Includes `string DisplayName`, `CrewAssignmentStatus Status`, `int CurrentTicketCount`, `IReadOnlyList<CrewSkill> Skills`, `DateTimeOffset LastStatusUpdate`, `CrewLocationSnapshot? Location`, `bool IsTelemetryStale`.
 
 ---
 
@@ -546,6 +720,11 @@ public sealed record OutageSummaryResponse(
 **Global Styles**: `wwwroot/app.css`
 
 **Component Scoping**: Use `.razor.css` files for scoped styles
+
+**Key Classnames**:
+- `.tickets-page`, `.tickets-grid-card`, `.tickets-detail-card`, `.ticket-timeline-card`
+- `.dispatch-page`, `.dispatch-recommendations-grid`, `.dispatch-ticket-list`
+- `.crew-status-panel`, `.crew-status-panel__alert` for acknowledgment warnings
 
 ### Radzen Theme
 

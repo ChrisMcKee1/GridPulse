@@ -2,20 +2,34 @@ using GridPulse.Application.Abstractions;
 using GridPulse.Application.Models;
 using GridPulse.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Linq;
 
 namespace GridPulse.Infrastructure.Repositories;
 
-internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicketRepository
+internal sealed class EfTicketRepository : ITicketRepository
 {
+    private readonly GridPulseDbContext _dbContext;
+
+    private DbSet<Ticket> Tickets => _dbContext.Set<Ticket>();
+
+    private DbSet<AssignmentEvent> AssignmentEvents => _dbContext.Set<AssignmentEvent>();
+
+    private DbSet<DispatchRecommendation> DispatchRecommendations => _dbContext.Set<DispatchRecommendation>();
+
+    public EfTicketRepository(GridPulseDbContext dbContext)
+    {
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    }
+
     public async Task<Ticket?> GetByIdAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
-        var ticket = await dbContext.Tickets
+        var ticket = await Tickets
             .AsSplitQuery()
             .Include(t => t.Events)
             .Include(t => t.Recommendations)
                 .ThenInclude(r => r.Crew)
-                    .ThenInclude(c => c.LocationHistory)
+                    .ThenInclude(c => c!.LocationHistory)
             .FirstOrDefaultAsync(t => t.Id == ticketId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -26,7 +40,7 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
     {
         options ??= new TicketQueryOptions();
 
-        var query = dbContext.Tickets.AsQueryable();
+        var query = Tickets.AsQueryable();
 
         var statuses = options.Statuses?.ToArray();
         if (statuses is { Length: > 0 })
@@ -48,7 +62,7 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
             query = query
                 .Include(ticket => ticket.Recommendations)
                     .ThenInclude(recommendation => recommendation.Crew)
-                        .ThenInclude(crew => crew.LocationHistory);
+                        .ThenInclude(crew => crew!.LocationHistory);
         }
 
         if (includeTimeline)
@@ -83,7 +97,7 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
             throw new ArgumentException("Crew identifier is required.", nameof(crewId));
         }
 
-        var ticket = await dbContext.Tickets
+        var ticket = await Tickets
             .AsSplitQuery()
             .Include(ticket => ticket.Events)
             .Include(ticket => ticket.Recommendations)
@@ -100,20 +114,20 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
     public async Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);
-        await dbContext.Tickets.AddAsync(ticket, cancellationToken).ConfigureAwait(false);
+        await Tickets.AddAsync(ticket, cancellationToken).ConfigureAwait(false);
     }
 
     public Task UpdateAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);
 
-        var local = dbContext.Tickets.Local.FirstOrDefault(t => t.Id == ticket.Id);
+        var local = Tickets.Local.FirstOrDefault(t => t.Id == ticket.Id);
         if (local is not null)
         {
-            dbContext.Entry(local).State = EntityState.Detached;
+            _dbContext.Entry(local).State = EntityState.Detached;
         }
 
-        dbContext.Tickets.Update(ticket);
+        Tickets.Update(ticket);
         ApplyAuditVersionOriginalValue(ticket);
 
         return Task.CompletedTask;
@@ -121,7 +135,7 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
 
     private void ApplyAuditVersionOriginalValue(Ticket ticket)
     {
-        var entry = dbContext.Entry(ticket);
+        var entry = _dbContext.Entry(ticket);
         var auditProperty = entry.Property(t => t.AuditVersion);
         if (!auditProperty.Metadata.IsConcurrencyToken)
         {
@@ -142,13 +156,13 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
     public async Task AddEventsAsync(IEnumerable<AssignmentEvent> events, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(events);
-        await dbContext.AssignmentEvents.AddRangeAsync(events, cancellationToken).ConfigureAwait(false);
+        await AssignmentEvents.AddRangeAsync(events, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task AddRecommendationsAsync(IEnumerable<DispatchRecommendation> recommendations, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(recommendations);
-        await dbContext.DispatchRecommendations.AddRangeAsync(recommendations, cancellationToken).ConfigureAwait(false);
+        await DispatchRecommendations.AddRangeAsync(recommendations, cancellationToken).ConfigureAwait(false);
     }
 
     public Task<bool> ExistsByOutageReferenceAsync(string outageReferenceId, CancellationToken cancellationToken = default)
@@ -158,13 +172,14 @@ internal sealed class EfTicketRepository(GridPulseDbContext dbContext) : ITicket
             throw new ArgumentException("Outage reference identifier is required.", nameof(outageReferenceId));
         }
 
-        return dbContext.Tickets.AnyAsync(
+        return Tickets.AnyAsync(
             ticket => ticket.OutageReferenceId == outageReferenceId,
             cancellationToken);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return dbContext.SaveChangesAsync(cancellationToken);
+        return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
 }

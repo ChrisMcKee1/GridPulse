@@ -1,13 +1,16 @@
 @page "/dispatch"
+@rendermode InteractiveAuto
 @using System.Linq
 @using GridPulse.Application.Models
 @using GridPulse.Domain.Enums
 @using GridPulse.Web.Services
 @using GridPulse.Web.Components.Organisms
+@using Microsoft.Extensions.Logging
 @using Radzen
 @using Radzen.Blazor
 @inject GridPulseApiClient ApiClient
 @inject NotificationService NotificationService
+@inject ILogger<DispatchBoard> Logger
 @implements IDisposable
 
 <RadzenStack class="dispatch-page" Gap="16px">
@@ -17,7 +20,7 @@
             <p class="dispatch-subtitle">Review tickets awaiting crew assignments, evaluate telemetry, and publish decisions.</p>
         </div>
 
-        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Disabled="@isLoadingTickets" Click="async () => await LoadTicketsAsync()">Refresh</RadzenButton>
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Disabled="@isLoadingTickets" Click="async () => await LoadTicketsAsync()" data-testid="dispatch-refresh">Refresh</RadzenButton>
     </RadzenStack>
 
     @if (!string.IsNullOrEmpty(errorMessage))
@@ -29,7 +32,7 @@
     {
         <div class="dispatch-toast" data-testid="assignment-receipt-toast" role="status" aria-live="polite">
             <span>@lastReceiptMessage</span>
-            <button type="button" class="dispatch-toast__close" @onclick="() => lastReceiptMessage = null">Dismiss</button>
+            <button type="button" class="dispatch-toast__close" data-testid="dispatch-toast-dismiss" @onclick="DismissToast">Dismiss</button>
         </div>
     }
 
@@ -167,10 +170,10 @@
                     }
 
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-                        <RadzenButton Icon="check" Disabled="@(!CanPublishAssignment)" Click="async () => await PublishAssignmentAsync(isOverride: false)">
+                        <RadzenButton Icon="check" Disabled="@(!CanPublishAssignment)" Click="async () => await PublishAssignmentAsync(isOverride: false)" data-testid="dispatch-publish">
                             @(isPublishingAssignment ? "Publishing..." : "Publish assignment")
                         </RadzenButton>
-                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="swap_horiz" Disabled="@(!CanPublishAssignment)" Click="OpenOverrideDialog">
+                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="swap_horiz" Disabled="@(!CanPublishAssignment)" Click="OpenOverrideDialog" data-testid="dispatch-override-button">
                             Override selection
                         </RadzenButton>
                     </RadzenStack>
@@ -210,7 +213,7 @@
         <div class="dispatch-override-dialog" role="dialog" aria-label="Override recommendation">
             <div class="dispatch-override-dialog__header">
                 <h3>Override recommendation</h3>
-                <button type="button" class="dispatch-override-dialog__close" @onclick="CloseOverrideDialog">✕</button>
+                <button type="button" class="dispatch-override-dialog__close" data-testid="dispatch-override-dismiss" @onclick="CloseOverrideDialog">✕</button>
             </div>
             <p class="dispatch-subtitle">Provide a brief justification before sending the assignment.</p>
             <label for="override-reason">Override reason</label>
@@ -224,10 +227,10 @@
                 <div class="dispatch-override-error">@overrideErrorMessage</div>
             }
             <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-                <RadzenButton Icon="send" ButtonStyle="ButtonStyle.Primary" Disabled="@isPublishingAssignment" Click="async () => await PublishAssignmentAsync(isOverride: true)">
+                <RadzenButton Icon="send" ButtonStyle="ButtonStyle.Primary" Disabled="@isPublishingAssignment" Click="async () => await PublishAssignmentAsync(isOverride: true)" data-testid="dispatch-override-send">
                     @(isPublishingAssignment ? "Sending..." : "Send assignment")
                 </RadzenButton>
-                <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CloseOverrideDialog">Cancel</RadzenButton>
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CloseOverrideDialog" data-testid="dispatch-override-cancel">Cancel</RadzenButton>
             </RadzenStack>
         </div>
     </div>
@@ -254,6 +257,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Logger.LogInformation("Dispatch board initializing");
         await LoadTicketsAsync();
         refreshLoopCts = new CancellationTokenSource();
         _ = RefreshRecommendationsLoopAsync(refreshLoopCts.Token);
@@ -261,6 +265,7 @@
 
     public void Dispose()
     {
+        Logger.LogInformation("Disposing dispatch board");
         recommendationsCts?.Cancel();
         recommendationsCts?.Dispose();
 
@@ -282,14 +287,23 @@
 
         try
         {
+            Logger.LogInformation("Loading dispatch tickets with filter {@Filter}", filter);
             var result = await ApiClient.GetTicketsAsync(filter);
             dispatchableTickets = result.Items
                 .Where(ticket => ticket.Status is TicketStatus.Open or TicketStatus.InProgress)
-                .OrderByDescending(ticket => ticket.Priority)
+                .OrderBy(ticket => ticket.Status == TicketStatus.InProgress ? 0 : 1)
+                .ThenBy(ticket => HasAssignmentPublishedEvent(ticket) ? 0 : 1)
+                .ThenBy(ticket => ticket.AssignedCrewId is not null ? 0 : 1)
+                .ThenBy(ticket => HasRecommendations(ticket) ? 0 : 1)
+                .ThenBy(ticket => ticket.Priority)
                 .ThenByDescending(ticket => ticket.UpdatedAt)
                 .ToArray();
 
-            var desiredId = preferredSelection ?? selectedTicketId ?? dispatchableTickets.FirstOrDefault()?.Id;
+            var desiredId = preferredSelection
+                ?? selectedTicketId
+                ?? dispatchableTickets.FirstOrDefault(IsDispatchReadyTicket)?.Id
+                ?? dispatchableTickets.FirstOrDefault(ticket => ticket.Status == TicketStatus.InProgress)?.Id
+                ?? dispatchableTickets.FirstOrDefault()?.Id;
             selectedTicket = desiredId is null
                 ? dispatchableTickets.FirstOrDefault()
                 : dispatchableTickets.FirstOrDefault(ticket => ticket.Id == desiredId) ?? dispatchableTickets.FirstOrDefault();
@@ -298,6 +312,7 @@
 
             if (selectedTicket is not null)
             {
+                Logger.LogInformation("Selected dispatch ticket {TicketId}", selectedTicket.Id);
                 await LoadRecommendationsAsync(selectedTicket.Id);
             }
             else
@@ -309,10 +324,12 @@
         catch (Exception ex)
         {
             errorMessage = $"Unable to load dispatch tickets: {ex.Message}";
+            Logger.LogError(ex, "Failed to load dispatch tickets");
         }
         finally
         {
             isLoadingTickets = false;
+            Logger.LogInformation("Dispatch tickets loaded (count={TicketCount})", dispatchableTickets.Count);
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -328,22 +345,25 @@
 
         try
         {
+            Logger.LogInformation("Loading recommendations for ticket {TicketId}", ticketId);
             var envelope = await ApiClient.GetRecommendationsAsync(ticketId, recommendationsCts.Token);
             recommendations = envelope.Recommendations
                 .OrderByDescending(rec => rec.CompositeScore)
                 .ToArray();
 
             selectedRecommendation = recommendations.FirstOrDefault(rec => rec.IsAutoSelected) ?? recommendations.FirstOrDefault();
+            Logger.LogInformation("Loaded {RecommendationCount} recommendations (selected crew={CrewId})", recommendations.Count, selectedRecommendation?.Crew.CrewId);
         }
         catch (OperationCanceledException)
         {
-            // ignored
+            Logger.LogDebug("Recommendation load canceled for ticket {TicketId}", ticketId);
         }
         catch (Exception ex)
         {
             errorMessage = $"Unable to load recommendations: {ex.Message}";
             recommendations = Array.Empty<DispatchRecommendationDto>();
             selectedRecommendation = null;
+            Logger.LogError(ex, "Failed to load recommendations for ticket {TicketId}", ticketId);
         }
         finally
         {
@@ -367,12 +387,18 @@
 
         selectedTicket = ticket;
         selectedTicketId = ticket.Id;
+        Logger.LogInformation("Dispatcher selected ticket {TicketId}", ticket.Id);
         await LoadRecommendationsAsync(ticket.Id);
     }
 
     private void SelectRecommendation(DispatchRecommendationDto recommendation)
     {
         selectedRecommendation = recommendation;
+        Logger.LogInformation("Recommendation selected for ticket {TicketId}: crew {CrewId} (override={IsOverride}, auto={IsAuto})",
+            selectedTicket?.Id,
+            recommendation.Crew.CrewId,
+            recommendation.IsOverride,
+            recommendation.IsAutoSelected);
     }
 
     private void OpenOverrideDialog()
@@ -385,6 +411,7 @@
         overrideReason = string.Empty;
         overrideErrorMessage = null;
         isOverrideDialogOpen = true;
+        Logger.LogInformation("Override dialog opened for ticket {TicketId}", selectedTicket?.Id);
     }
 
     private void CloseOverrideDialog()
@@ -392,6 +419,7 @@
         isOverrideDialogOpen = false;
         overrideReason = null;
         overrideErrorMessage = null;
+        Logger.LogInformation("Override dialog closed for ticket {TicketId}", selectedTicket?.Id);
     }
 
     private async Task PublishAssignmentAsync(bool isOverride)
@@ -404,12 +432,14 @@
         if (isOverride && string.IsNullOrWhiteSpace(overrideReason))
         {
             overrideErrorMessage = "Override reason is required.";
+            Logger.LogWarning("Override attempted without reason for ticket {TicketId}", selectedTicket?.Id);
             return;
         }
 
         isPublishingAssignment = true;
         overrideErrorMessage = null;
         errorMessage = null;
+        Logger.LogInformation("Publishing assignment for ticket {TicketId} (crew={CrewId}, override={IsOverride})", selectedTicket.Id, selectedRecommendation.Crew.CrewId, isOverride);
 
         var request = new DispatchAssignmentRequest
         {
@@ -426,11 +456,13 @@
             CloseOverrideDialog();
             await LoadTicketsAsync(selectedTicket.Id);
             NotificationService.Notify(NotificationSeverity.Success, "Assignment queued", lastReceiptMessage);
+            Logger.LogInformation("Assignment published for ticket {TicketId} with tracking {TrackingId}", selectedTicket.Id, receipt.TrackingId);
         }
         catch (Exception ex)
         {
             errorMessage = $"Unable to publish assignment: {ex.Message}";
             NotificationService.Notify(NotificationSeverity.Error, "Assignment failed", ex.Message);
+            Logger.LogError(ex, "Failed to publish assignment for ticket {TicketId}", selectedTicket.Id);
         }
         finally
         {
@@ -443,6 +475,7 @@
     {
         try
         {
+            Logger.LogInformation("Starting recommendation refresh loop");
             while (!cancellationToken.IsCancellationRequested)
             {
                 await Task.Delay(RecommendationRefreshInterval, cancellationToken);
@@ -455,7 +488,7 @@
         }
         catch (OperationCanceledException)
         {
-            // expected during disposal
+            Logger.LogInformation("Recommendation refresh loop canceled");
         }
     }
 
@@ -492,17 +525,25 @@
             lastReceiptMessage ??= "Crew status sent.";
             NotificationService.Notify(NotificationSeverity.Success, "Crew status sent", lastReceiptMessage);
             await LoadTicketsAsync(selectedTicket?.Id);
+            Logger.LogInformation("Crew status {Status} posted for crew {CrewId} on ticket {TicketId}", status, crewId, selectedTicket?.Id);
         }
         catch (Exception ex)
         {
             errorMessage = $"Unable to send crew status: {ex.Message}";
             NotificationService.Notify(NotificationSeverity.Error, "Crew status failed", ex.Message);
+            Logger.LogError(ex, "Failed to send crew status for crew {CrewId} on ticket {TicketId}", crewId, selectedTicket?.Id);
         }
         finally
         {
             isSubmittingCrewStatus = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private void DismissToast()
+    {
+        Logger.LogInformation("Dispatcher dismissed toast message");
+        lastReceiptMessage = null;
     }
 
     private bool CanPublishAssignment => selectedTicket is not null && selectedRecommendation is not null && !isPublishingAssignment;
@@ -551,4 +592,17 @@
         CrewAssignmentStatus.Acknowledged => $"Crew acknowledgement sent for {ticketTitle}.",
         _ => $"Crew status '{status}' sent for {ticketTitle}."
     };
+
+    private static bool HasAssignmentPublishedEvent(TicketDto ticket)
+    {
+        var events = ticket.Events ?? Array.Empty<AssignmentEventDto>();
+        return events.Any(evt => evt.EventType == AssignmentEventType.AssignmentPublished);
+    }
+
+    private static bool HasRecommendations(TicketDto ticket) => (ticket.Recommendations?.Count ?? 0) > 0;
+
+    private static bool IsDispatchReadyTicket(TicketDto ticket) =>
+        ticket.Status == TicketStatus.InProgress
+        && ticket.AssignedCrewId is not null
+        && HasAssignmentPublishedEvent(ticket);
 }

@@ -20,6 +20,9 @@ internal sealed class DispatchOptimizationService : IDispatchOptimizationService
     private const int MaxEtaMinutes = 180;
     private const int MinEtaMinutes = 5;
     private const double MaxWorkload = 5d;
+    private const double TelemetryDistancePenalty = 0.25;
+    private const double TelemetryCompositePenalty = 0.3;
+    private const int TelemetryEtaPenaltyMinutes = 60;
 
     private readonly ITicketRepository _ticketRepository;
     private readonly IDispatchRepository _dispatchRepository;
@@ -199,13 +202,14 @@ internal sealed class DispatchOptimizationService : IDispatchOptimizationService
         var telemetryStale = snapshot is null || snapshot.IsStale;
         if (telemetryStale)
         {
-            distanceScore = Math.Max(0d, distanceScore - 0.1d);
+            distanceScore = Math.Max(0d, distanceScore - TelemetryDistancePenalty);
             composite = Math.Round(
                 (DistanceWeight * distanceScore) +
                 (SkillWeight * skillScore) +
                 (WorkloadWeight * workloadScore),
                 4,
                 MidpointRounding.AwayFromZero);
+            composite = Math.Max(0d, composite - TelemetryCompositePenalty);
         }
 
         return (eta, distanceScore, skillScore, workloadScore, composite, telemetryStale);
@@ -266,8 +270,17 @@ internal sealed class DispatchOptimizationService : IDispatchOptimizationService
             return Math.Clamp(baseMinutes + 15, MinEtaMinutes, MaxEtaMinutes);
         }
 
-        var stalePenalty = snapshot.IsStale ? 10 : 0;
-        return Math.Clamp(baseMinutes + stalePenalty, MinEtaMinutes, MaxEtaMinutes);
+        var signalPenalty = snapshot.SignalAgeSeconds switch
+        {
+            >= 600 => 35,
+            >= 300 => 25,
+            >= 180 => 15,
+            >= 60 => 5,
+            _ => 0
+        };
+
+        var stalePenalty = snapshot.IsStale ? TelemetryEtaPenaltyMinutes : 0;
+        return Math.Clamp(baseMinutes + signalPenalty + stalePenalty, MinEtaMinutes, MaxEtaMinutes);
     }
 
     private static TicketSummaryDto ToSummary(Ticket ticket)
