@@ -16,12 +16,12 @@
 <RadzenStack Gap="1.5rem" class="tickets-page">
 	<!-- Hero Header -->
 	<RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.75rem">
-		<div>
-			<h1 data-testid="tickets-heading" style="margin: 0; font-size: 2.5rem;">Ticket Management</h1>
-			<p class="tickets-subtitle">Monitor outage tickets, review duplicates, and advance workflow states</p>
-		</div>
+		<RadzenStack Gap="0.25rem">
+			<RadzenText TextStyle="TextStyle.H2" TagName="TagName.H1" data-testid="tickets-heading" Style="margin: 0;">Ticket Management</RadzenText>
+			<RadzenText TextStyle="TextStyle.Body2" Class="tickets-subtitle">Monitor outage tickets, review duplicates, and advance workflow states</RadzenText>
+		</RadzenStack>
 
-		<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+		<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">\
 			<RadzenButton Icon="refresh" 
 						  Variant="Variant.Outlined"
 						  Click="async () => await LoadTicketsAsync()" 

@@ -6,14 +6,16 @@ const ticketsHeading = /Tickets/i;
 
 const navigateToTickets = async (page: Page) => {
   await page.goto('/tickets');
-  await expect(page.getByRole('heading', { name: ticketsHeading })).toBeVisible();
+  // RadzenText with TagName.H1 renders as <h1> element
+  await expect(page.getByRole('heading', { level: 1, name: ticketsHeading })).toBeVisible();
 };
 
 async function navigateToDispatchBoard(page: import('@playwright/test').Page) {
   await page.goto('/dispatch');
   await expect(page).toHaveURL(/\/dispatch$/, { timeout: 15000 });
-  // All browsers need time for Interactive Auto prerendering
-  await expect(page.getByRole('heading', { name: dispatchHeading })).toBeVisible({ timeout: 30000 });
+  // All browsers need time for Interactive Server rendering
+  // RadzenText with TagName.H1 renders as <h1> element
+  await expect(page.getByRole('heading', { level: 1, name: dispatchHeading })).toBeVisible({ timeout: 30000 });
 }
 
 const scrollThroughPage = async (page: Page) => {
@@ -54,7 +56,8 @@ test.describe('Dispatcher board workflows', () => {
     await expect(overrideButton).toBeEnabled({ timeout: 10000 });
     await overrideButton.click();
     
-    const overrideDialog = page.getByRole('dialog', { name: /Override recommendation/i });
+    // DialogService.OpenAsync creates dialog with exact title as accessible name
+    const overrideDialog = page.getByRole('dialog', { name: 'Override recommendation' });
     await expect(overrideDialog).toBeVisible({ timeout: 10000 });
 
     // Fill in override reason
@@ -74,7 +77,8 @@ test.describe('Dispatcher board workflows', () => {
 
   test('shows assignment timeline with recommendation events', async ({ page }) => {
     // Ensure page is fully loaded before checking timeline
-    await expect(page.getByRole('heading', { name: /Dispatch Board/i })).toBeVisible({ timeout: 10000 });
+    // RadzenText with TagName.H1 renders as <h1> element
+    await expect(page.getByRole('heading', { level: 1, name: /Dispatch Board/i })).toBeVisible({ timeout: 10000 });
     
     const timeline = page.getByTestId('dispatch-timeline');
     await expect(timeline).toBeVisible({ timeout: 10000 });
