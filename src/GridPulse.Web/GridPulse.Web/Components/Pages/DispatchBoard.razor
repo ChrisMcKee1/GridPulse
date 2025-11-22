@@ -142,10 +142,9 @@
 
                         <RadzenDataGrid TItem="DispatchRecommendationDto" 
                                        Data="@recommendations" 
-                                       @bind-Value="@selectedRecommendationList"
                                        SelectionMode="DataGridSelectionMode.Single"
                                        AllowRowSelectOnRowClick="true"
-                                       RowClick="@(args => SelectRecommendation(args.Data))"
+                                       RowSelect="@(args => OnRecommendationSelected(args))"
                                        RowRender="@(args => OnRowRender(args))"
                                        data-testid="crew-recommendations-grid"
                                        AllowSorting="true"
@@ -246,7 +245,6 @@
     private Guid? selectedTicketId;
     private IReadOnlyList<DispatchRecommendationDto> recommendations = Array.Empty<DispatchRecommendationDto>();
     private DispatchRecommendationDto? selectedRecommendation;
-    private IList<DispatchRecommendationDto>? selectedRecommendationList;
     private bool isLoadingTickets = true;
     private bool isLoadingRecommendations;
     private bool isSubmittingCrewStatus;
@@ -322,7 +320,6 @@
             {
                 recommendations = Array.Empty<DispatchRecommendationDto>();
                 selectedRecommendation = null;
-                selectedRecommendationList = null;
             }
         }
         catch (Exception ex)
@@ -348,6 +345,13 @@
             : string.Empty);
     }
 
+    private void OnRecommendationSelected(DispatchRecommendationDto recommendation)
+    {
+        selectedRecommendation = recommendation;
+        Logger.LogInformation("Recommendation selected for ticket {TicketId}: crew {CrewId} (override={IsOverride}, auto={IsAuto})",
+            selectedTicket?.Id, recommendation.Crew.CrewId, recommendation.IsOverride, recommendation.IsAutoSelected);
+    }
+
     private async Task LoadRecommendationsAsync(Guid ticketId)
     {
         recommendationsCts?.Cancel();
@@ -366,9 +370,6 @@
                 .ToArray();
 
             selectedRecommendation = recommendations.FirstOrDefault(rec => rec.IsAutoSelected) ?? recommendations.FirstOrDefault();
-            selectedRecommendationList = selectedRecommendation != null 
-                ? new List<DispatchRecommendationDto> { selectedRecommendation }
-                : null;
             var selectedCrewId = selectedRecommendation?.Crew.CrewId;
             Logger.LogInformation("Loaded {RecommendationCount} recommendations (selected crew={CrewId})", recommendations.Count, selectedCrewId);
         }
@@ -381,7 +382,6 @@
             errorMessage = $"Unable to load recommendations: {ex.Message}";
             recommendations = Array.Empty<DispatchRecommendationDto>();
             selectedRecommendation = null;
-            selectedRecommendationList = null;
             Logger.LogError(ex, "Failed to load recommendations for ticket {TicketId}", ticketId);
         }
         finally
@@ -408,18 +408,6 @@
         selectedTicketId = ticket.Id;
         Logger.LogInformation("Dispatcher selected ticket {TicketId}", ticket.Id);
         await LoadRecommendationsAsync(ticket.Id);
-    }
-
-    private void SelectRecommendation(DispatchRecommendationDto recommendation)
-    {
-        selectedRecommendation = recommendation;
-        selectedRecommendationList = new List<DispatchRecommendationDto> { recommendation };
-        var ticketId = selectedTicket?.Id;
-        Logger.LogInformation("Recommendation selected for ticket {TicketId}: crew {CrewId} (override={IsOverride}, auto={IsAuto})",
-            ticketId,
-            recommendation.Crew.CrewId,
-            recommendation.IsOverride,
-            recommendation.IsAutoSelected);
     }
 
     private async Task OpenOverrideDialog()
