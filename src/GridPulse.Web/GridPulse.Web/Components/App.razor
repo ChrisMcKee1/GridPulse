@@ -13,16 +13,44 @@
     <link rel="stylesheet" href="@Assets["_content/Radzen.Blazor/css/material.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <RadzenTheme Theme="material" @rendermode="InteractiveAuto" />
-    <Routes @rendermode="InteractiveAuto" />
-    <RadzenComponents @rendermode="InteractiveAuto" />
+    <RadzenTheme />
+    <GridPulse.Web.Components.Routes @rendermode="InteractiveServer" />
+    <RadzenComponents />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["_content/Radzen.Blazor/Radzen.Blazor.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [Inject]
+    private ThemeService ThemeService { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (HttpContext != null)
+        {
+            var theme = HttpContext.Request.Cookies["GridPulseTheme"];
+
+            if (!string.IsNullOrEmpty(theme))
+            {
+                ThemeService.SetTheme(theme, triggerChange: false);
+            }
+            else
+            {
+                // Set default theme if no cookie exists
+                ThemeService.SetTheme("material", triggerChange: false);
+            }
+        }
+    }
+}

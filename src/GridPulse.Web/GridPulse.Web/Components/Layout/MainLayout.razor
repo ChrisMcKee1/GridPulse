@@ -1,20 +1,33 @@
 ﻿@inherits LayoutComponentBase
+@inject CookieThemeService CookieThemeService
 
-<div class="page">
-    <div class="sidebar">
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal"
+                    AlignItems="AlignItems.Center"
+                    JustifyContent="JustifyContent.SpaceBetween"
+                    Gap="1rem"
+                    Style="padding: 1rem 1.5rem;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="electric_bolt" Style="font-size: 1.75rem;" />
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1" Style="margin: 0;">Zava Power</RadzenText>
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                <ThemeToggle />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenHeader>
+
+    <RadzenSidebar>
         <NavMenu />
-    </div>
+    </RadzenSidebar>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    <RadzenBody>
+        <div style="padding: 1.5rem;">
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </RadzenBody>
+</RadzenLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

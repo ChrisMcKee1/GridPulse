@@ -1,18 +1,18 @@
 @using GridPulse.Web.Components.Organisms.Models
 
 <RadzenCard>
-    <h4>Latest activity</h4>
-    <ul class="activity-list">
+    <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">Latest activity</RadzenText>
+    <RadzenStack Gap="1.25rem" Style="margin: 1rem 0 0; padding: 0;">
         @foreach (var item in Items)
         {
-            <li class="timeline-item">
-                <div class="timeline-item__meta">@item.Timestamp.ToLocalTime().ToString("g")</div>
-                <strong>@item.Title</strong>
-                <p>@item.Description</p>
+            <RadzenStack Gap="0.5rem" Class="timeline-item" Style="padding-bottom: 0.75rem;">
+                <RadzenText TextStyle="TextStyle.Caption" Class="timeline-item__meta">@item.Timestamp.ToLocalTime().ToString("g")</RadzenText>
+                <RadzenText TextStyle="TextStyle.Subtitle1">@item.Title</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">@item.Description</RadzenText>
                 <StatusChip Label="@item.StatusVariant" Variant="@item.StatusVariant.ToLowerInvariant()" />
-            </li>
+            </RadzenStack>
         }
-    </ul>
+    </RadzenStack>
 </RadzenCard>
 
 @code {

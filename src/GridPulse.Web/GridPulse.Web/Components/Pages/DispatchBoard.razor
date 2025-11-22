@@ -1,5 +1,5 @@
 @page "/dispatch"
-@rendermode InteractiveAuto
+@rendermode InteractiveServer
 @using System.Linq
 @using GridPulse.Application.Models
 @using GridPulse.Domain.Enums
@@ -10,94 +10,119 @@
 @using Radzen.Blazor
 @inject GridPulseApiClient ApiClient
 @inject NotificationService NotificationService
+@inject DialogService DialogService
 @inject ILogger<DispatchBoard> Logger
 @implements IDisposable
 
-<RadzenStack class="dispatch-page" Gap="16px">
-    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-        <div>
-            <h1 data-testid="dispatch-heading">Dispatch Board</h1>
-            <p class="dispatch-subtitle">Review tickets awaiting crew assignments, evaluate telemetry, and publish decisions.</p>
-        </div>
+<RadzenStack class="dispatch-page" Gap="1.5rem">
+    <!-- Hero Header -->
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="0.75rem">
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.H2" TagName="TagName.H1" data-testid="dispatch-heading" Style="margin: 0;">Dispatch Board</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Class="dispatch-subtitle">Review tickets awaiting crew assignments, evaluate telemetry, and publish decisions</RadzenText>
+        </RadzenStack>
 
-        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Disabled="@isLoadingTickets" Click="async () => await LoadTicketsAsync()" data-testid="dispatch-refresh">Refresh</RadzenButton>
+        <RadzenButton Icon="refresh" 
+                      Variant="Variant.Outlined"
+                      Disabled="@isLoadingTickets" 
+                      Click="async () => await LoadTicketsAsync()" 
+                      data-testid="dispatch-refresh">
+            Refresh
+        </RadzenButton>
     </RadzenStack>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <RadzenAlert AlertStyle="AlertStyle.Danger" Closeable="true" Text="@errorMessage" />
+        <RadzenAlert AlertStyle="AlertStyle.Danger" 
+                     Variant="Variant.Flat"
+                     Shade="Shade.Lighter"
+                     Closeable="true" 
+                     Text="@errorMessage" />
     }
 
     @if (!string.IsNullOrEmpty(lastReceiptMessage))
     {
-        <div class="dispatch-toast" data-testid="assignment-receipt-toast" role="status" aria-live="polite">
-            <span>@lastReceiptMessage</span>
-            <button type="button" class="dispatch-toast__close" data-testid="dispatch-toast-dismiss" @onclick="DismissToast">Dismiss</button>
-        </div>
+        <RadzenAlert AlertStyle="AlertStyle.Success" 
+                     Variant="Variant.Flat"
+                     Shade="Shade.Lighter"
+                     Closeable="true"
+                     Close="@DismissToast"
+                     Style="margin-bottom: 1rem;"
+                     data-testid="assignment-receipt-toast">
+            @lastReceiptMessage
+        </RadzenAlert>
     }
 
-    <div class="dispatch-layout">
-        <RadzenCard class="dispatch-ticket-card">
-            <div class="dispatch-card-header">
-                <div>
-                    <h3>Tickets awaiting dispatch</h3>
-                    <p class="dispatch-subtitle">Open and in-progress work</p>
-                </div>
-            </div>
+    <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh - 200px);">
+        <RadzenSplitterPane Size="30%" Min="20%" Max="40%">
+            <RadzenCard class="dispatch-ticket-card" Style="height: 100%; display: flex; flex-direction: column;">
+                <RadzenStack Gap="1rem" Style="flex: 1; min-height: 0;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Tickets awaiting dispatch</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Class="dispatch-subtitle">Open and in-progress work</RadzenText>
+                    </RadzenStack>
 
-            <div class="dispatch-ticket-list" data-testid="dispatch-ticket-list">
-                @if (isLoadingTickets)
-                {
-                    <RadzenSkeleton Lines="6" />
-                }
-                else if (dispatchableTickets.Count == 0)
-                {
-                    <p>No tickets require dispatcher attention right now.</p>
-                }
-                else
-                {
-                    @foreach (var ticket in dispatchableTickets)
-                    {
-                        var isActive = ticket.Id == selectedTicketId;
-                        <button type="button"
-                            class="dispatch-ticket-list__item @(isActive ? "active" : string.Empty)"
-                            data-active="@isActive"
-                                aria-pressed="@ToAriaBool(isActive)"
-                            @onclick="() => OnTicketSelectedAsync(ticket.Id)">
-                            <div class="dispatch-ticket-list__title">@ticket.Title</div>
-                            <div class="dispatch-ticket-list__meta">
-                                <StatusChip Label="@ticket.Status.ToString()" Variant="@GetStatusVariant(ticket.Status)" />
-                                <span>Priority @ticket.Priority</span>
-                                <span>@ticket.CustomerImpact customers</span>
-                            </div>
-                        </button>
-                    }
-                }
-            </div>
-        </RadzenCard>
+                    <RadzenStack Gap="0.5rem" Style="flex: 1; overflow-y: auto;" data-testid="dispatch-ticket-list">
+                        @if (isLoadingTickets)
+                        {
+                            <RadzenSkeleton Lines="6" />
+                        }
+                        else if (dispatchableTickets.Count == 0)
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2">No tickets require dispatcher attention right now.</RadzenText>
+                        }
+                        else
+                        {
+                            @foreach (var ticket in dispatchableTickets)
+                            {
+                                var isActive = ticket.Id == selectedTicketId;
+                                <RadzenCard Style="@GetTicketCardStyle(isActive)"
+                                            @onclick="() => OnTicketSelectedAsync(ticket.Id)">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Start">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: 500;">@ticket.Title</RadzenText>
+                                            @if (isActive)
+                                            {
+                                                <RadzenIcon Icon="check_circle" Style="color: var(--rz-primary);" />
+                                            }
+                                        </RadzenStack>
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                            <StatusChip Label="@ticket.Status.ToString()" Variant="@GetStatusVariant(ticket.Status)" />
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"P{ticket.Priority}")" />
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{ticket.CustomerImpact} customers")" />
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            }
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenSplitterPane>
 
-        <div class="dispatch-detail-column">
-            <RadzenCard class="dispatch-recommendations-card">
-                <RadzenStack Gap="12px">
-                    <div class="dispatch-card-header">
-                        <div>
-                            <h3>Recommendations</h3>
+        <RadzenSplitterPane>
+            <RadzenStack Gap="1rem" Style="height: 100%; padding: 0.5rem; overflow-y: auto;">
+                <RadzenCard class="dispatch-recommendations-card">
+                    <RadzenStack Gap="12px">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Recommendations</RadzenText>
                             @if (selectedTicket is not null)
                             {
-                                <p class="dispatch-subtitle">@selectedTicket.Title</p>
+                                <RadzenText TextStyle="TextStyle.Body2" Class="dispatch-subtitle">@selectedTicket.Title</RadzenText>
                             }
-                        </div>
-                        <div class="dispatch-recommendation-hints">
-                            @if (selectedRecommendation is not null)
-                            {
-                                <span>Selected crew: <strong>@selectedRecommendation.Crew.DisplayName</strong></span>
-                            }
-                            @if (selectedTicket is not null)
-                            {
-                                <span>Updated @selectedTicket.UpdatedAt.ToLocalTime().ToString("g")</span>
-                            }
-                        </div>
-                    </div>
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" Wrap="FlexWrap.Wrap" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                @if (selectedRecommendation is not null)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption">
+                                        Selected crew: <RadzenText TextStyle="TextStyle.Subtitle2" Style="display: inline;">@selectedRecommendation.Crew.DisplayName</RadzenText>
+                                    </RadzenText>
+                                }
+                                @if (selectedTicket is not null)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption">Updated @selectedTicket.UpdatedAt.ToLocalTime().ToString("g")</RadzenText>
+                                }
+                            </RadzenStack>
+                        </RadzenStack>
 
                     @if (isLoadingRecommendations)
                     {
@@ -115,58 +140,61 @@
                             <RadzenAlert AlertStyle="AlertStyle.Warning" Text="@BuildTelemetryWarning(staleCount)" />
                         }
 
-                            <div class="dispatch-recommendations-grid"
-                                data-testid="crew-recommendations-grid"
-                                role="table"
-                                aria-label="Crew recommendations"
-                                aria-busy="@ToAriaBool(isLoadingRecommendations)">
-                            <div class="dispatch-recommendations-grid__header" role="row">
-                                <span role="columnheader">Crew</span>
-                                <span role="columnheader">Score</span>
-                                <span role="columnheader">Workload</span>
-                                <span role="columnheader">Actions</span>
-                            </div>
-                            @foreach (var recommendation in recommendations)
-                            {
-                                var isActive = selectedRecommendation?.Crew.CrewId == recommendation.Crew.CrewId;
-                                <div class="dispatch-recommendations-grid__row @(isActive ? "active" : string.Empty)"
-                                     role="row"
-                                     aria-selected="@ToAriaBool(isActive)"
-                                     data-selected="@ToAriaBool(recommendation.IsAutoSelected)"
-                                     tabindex="0"
-                                     @onclick="() => SelectRecommendation(recommendation)">
-                                    <div class="dispatch-recommendations-grid__crew" role="cell">
-                                        <div class="dispatch-recommendations-grid__crew-name">@recommendation.Crew.DisplayName</div>
-                                        <div class="dispatch-recommendations-grid__crew-meta">
-                                            <span>@recommendation.Crew.Status</span>
-                                            <span>@string.Join(", ", recommendation.Crew.Skills)</span>
-                                        </div>
-                                        @if (recommendation.Crew.IsTelemetryStale)
-                                        {
-                                            <span class="dispatch-telemetry-chip" data-testid="telemetry-stale-badge">Telemetry stale</span>
-                                        }
-                                    </div>
-                                    <div class="dispatch-recommendations-grid__score" role="cell">
-                                        <span class="dispatch-score-chip" data-testid="score-chip">@recommendation.CompositeScore.ToString("P0")</span>
-                                        <small>ETA @recommendation.EtaMinutes mins</small>
-                                    </div>
-                                    <div class="dispatch-recommendations-grid__workload" role="cell">
-                                        <span>@recommendation.Crew.CurrentTicketCount active</span>
-                                        <small>@(recommendation.ScoreComponents.TryGetValue("workload", out var workloadScore) ? $"Workload {workloadScore:P0}" : string.Empty)</small>
-                                    </div>
-                                    <div class="dispatch-recommendations-grid__actions" role="cell">
-                                        @if (recommendation.IsAutoSelected)
-                                        {
-                                            <span class="dispatch-auto-chip">Auto</span>
-                                        }
-                                        @if (recommendation.IsOverride && !string.IsNullOrWhiteSpace(recommendation.OverrideReason))
-                                        {
-                                            <span class="dispatch-override-chip">Override: @recommendation.OverrideReason</span>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                        </div>
+                        <RadzenDataGrid TItem="DispatchRecommendationDto" 
+                                       Data="@recommendations" 
+                                       AllowRowSelectOnRowClick="true"
+                                       RowClick="@(args => SelectRecommendation(args.Data))"
+                                       data-testid="crew-recommendations-grid"
+                                       AllowSorting="true"
+                                       Style="margin: 1rem 0;">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Crew" Width="200px">
+                                    <Template Context="recommendation">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1">@recommendation.Crew.DisplayName</RadzenText>
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                                <RadzenText TextStyle="TextStyle.Caption">@recommendation.Crew.Status</RadzenText>
+                                                <RadzenText TextStyle="TextStyle.Caption">@string.Join(", ", recommendation.Crew.Skills)</RadzenText>
+                                            </RadzenStack>
+                                            @if (recommendation.Crew.IsTelemetryStale)
+                                            {
+                                                <RadzenBadge Text="Telemetry stale" BadgeStyle="BadgeStyle.Warning" data-testid="telemetry-stale-badge" />
+                                            }
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Score" Width="120px">
+                                    <Template Context="recommendation">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenBadge Text="@recommendation.CompositeScore.ToString("P0")" BadgeStyle="BadgeStyle.Success" data-testid="score-chip" />
+                                            <RadzenText TextStyle="TextStyle.Caption">ETA @recommendation.EtaMinutes mins</RadzenText>
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Workload" Width="150px">
+                                    <Template Context="recommendation">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Body2">@recommendation.Crew.CurrentTicketCount active</RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption">@(recommendation.ScoreComponents.TryGetValue("workload", out var workloadScore) ? $"Workload {workloadScore:P0}" : string.Empty)</RadzenText>
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Status" Width="120px">
+                                    <Template Context="recommendation">
+                                        <RadzenStack Gap="0.25rem">
+                                            @if (recommendation.IsAutoSelected)
+                                            {
+                                                <RadzenBadge Text="Auto" BadgeStyle="BadgeStyle.Info" />
+                                            }
+                                            @if (recommendation.IsOverride && !string.IsNullOrWhiteSpace(recommendation.OverrideReason))
+                                            {
+                                                <RadzenBadge Text="@($"Override: {recommendation.OverrideReason}")" BadgeStyle="BadgeStyle.Warning" />
+                                            }
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
                     }
 
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
@@ -178,63 +206,35 @@
                         </RadzenButton>
                     </RadzenStack>
                 </RadzenStack>
-            </RadzenCard>
+                </RadzenCard>
 
-            <div class="dispatch-side-panels">
-                <div data-testid="dispatch-timeline">
-                    <TicketTimeline Events="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())" />
-                </div>
-                <div>
-                    @{
-                        var activeCrew = ActiveCrew;
-                    }
-                    @if (activeCrew is not null && selectedTicket is not null)
-                    {
-                        <CrewStatusPanel Crew="activeCrew"
-                                         Timeline="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())"
-                                         IsSubmitting="isSubmittingCrewStatus"
-                                         StatusSubmitted="OnCrewStatusSubmittedAsync" />
-                    }
-                    else
-                    {
-                        <div class="crew-status-panel crew-status-panel--empty">
-                            <p>Select a dispatched ticket to manage crew acknowledgements.</p>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-</RadzenStack>
-
-@if (isOverrideDialogOpen && selectedRecommendation is not null && selectedTicket is not null)
-{
-    <div class="dispatch-override-dialog__backdrop">
-        <div class="dispatch-override-dialog" role="dialog" aria-label="Override recommendation">
-            <div class="dispatch-override-dialog__header">
-                <h3>Override recommendation</h3>
-                <button type="button" class="dispatch-override-dialog__close" data-testid="dispatch-override-dismiss" @onclick="CloseOverrideDialog">✕</button>
-            </div>
-            <p class="dispatch-subtitle">Provide a brief justification before sending the assignment.</p>
-            <label for="override-reason">Override reason</label>
-            <RadzenTextArea id="override-reason"
-                            @bind-Value="overrideReason"
-                            Name="OverrideReason"
-                            Rows="3"
-                            Placeholder="Explain why a non-automatic crew was selected" />
-            @if (!string.IsNullOrEmpty(overrideErrorMessage))
-            {
-                <div class="dispatch-override-error">@overrideErrorMessage</div>
-            }
-            <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-                <RadzenButton Icon="send" ButtonStyle="ButtonStyle.Primary" Disabled="@isPublishingAssignment" Click="async () => await PublishAssignmentAsync(isOverride: true)" data-testid="dispatch-override-send">
-                    @(isPublishingAssignment ? "Sending..." : "Send assignment")
-                </RadzenButton>
-                <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="cancel" Click="CloseOverrideDialog" data-testid="dispatch-override-cancel">Cancel</RadzenButton>
+                <RadzenStack Gap="1rem">
+                    <RadzenStack data-testid="dispatch-timeline">
+                        <TicketTimeline Events="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())" />
+                    </RadzenStack>
+                    <RadzenStack>
+                        @{
+                            var activeCrew = ActiveCrew;
+                        }
+                        @if (activeCrew is not null && selectedTicket is not null)
+                        {
+                            <CrewStatusPanel Crew="activeCrew"
+                                             Timeline="@(selectedTicket?.Events ?? Array.Empty<AssignmentEventDto>())"
+                                             IsSubmitting="isSubmittingCrewStatus"
+                                             StatusSubmitted="OnCrewStatusSubmittedAsync" />
+                        }
+                        else
+                        {
+                            <RadzenCard Style="padding: 2rem; text-align: center;">
+                                <RadzenText TextStyle="TextStyle.Body2">Select a dispatched ticket to manage crew acknowledgements.</RadzenText>
+                            </RadzenCard>
+                        }
+                    </RadzenStack>
+                </RadzenStack>
             </RadzenStack>
-        </div>
-    </div>
-}
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+</RadzenStack>
 
 @code {
     private static readonly TimeSpan RecommendationRefreshInterval = TimeSpan.FromSeconds(45);
@@ -247,7 +247,6 @@
     private bool isLoadingRecommendations;
     private bool isSubmittingCrewStatus;
     private bool isPublishingAssignment;
-    private bool isOverrideDialogOpen;
     private string? overrideReason;
     private string? overrideErrorMessage;
     private string? errorMessage;
@@ -352,7 +351,8 @@
                 .ToArray();
 
             selectedRecommendation = recommendations.FirstOrDefault(rec => rec.IsAutoSelected) ?? recommendations.FirstOrDefault();
-            Logger.LogInformation("Loaded {RecommendationCount} recommendations (selected crew={CrewId})", recommendations.Count, selectedRecommendation?.Crew.CrewId);
+            var selectedCrewId = selectedRecommendation?.Crew.CrewId;
+            Logger.LogInformation("Loaded {RecommendationCount} recommendations (selected crew={CrewId})", recommendations.Count, selectedCrewId);
         }
         catch (OperationCanceledException)
         {
@@ -394,14 +394,15 @@
     private void SelectRecommendation(DispatchRecommendationDto recommendation)
     {
         selectedRecommendation = recommendation;
+        var ticketId = selectedTicket?.Id;
         Logger.LogInformation("Recommendation selected for ticket {TicketId}: crew {CrewId} (override={IsOverride}, auto={IsAuto})",
-            selectedTicket?.Id,
+            ticketId,
             recommendation.Crew.CrewId,
             recommendation.IsOverride,
             recommendation.IsAutoSelected);
     }
 
-    private void OpenOverrideDialog()
+    private async Task OpenOverrideDialog()
     {
         if (!CanPublishAssignment)
         {
@@ -410,16 +411,55 @@
 
         overrideReason = string.Empty;
         overrideErrorMessage = null;
-        isOverrideDialogOpen = true;
-        Logger.LogInformation("Override dialog opened for ticket {TicketId}", selectedTicket?.Id);
-    }
+        var ticketId = selectedTicket?.Id;
+        Logger.LogInformation("Override dialog opened for ticket {TicketId}", ticketId);
 
-    private void CloseOverrideDialog()
-    {
-        isOverrideDialogOpen = false;
-        overrideReason = null;
-        overrideErrorMessage = null;
-        Logger.LogInformation("Override dialog closed for ticket {TicketId}", selectedTicket?.Id);
+        var result = await DialogService.OpenAsync("Override recommendation", ds =>
+            @<RadzenStack Gap="1.5rem">
+                <RadzenText TextStyle="TextStyle.Body2">Provide a brief justification before sending the assignment.</RadzenText>
+                
+                <RadzenStack Gap="0.5rem">
+                    <RadzenLabel Text="Override reason" Component="override-reason" />
+                    <RadzenTextArea id="override-reason"
+                                    @bind-Value="@overrideReason"
+                                    Name="OverrideReason"
+                                    Rows="3"
+                                    Placeholder="Explain why a non-automatic crew was selected"
+                                    data-testid="override-reason" />
+                </RadzenStack>
+
+                @if (!string.IsNullOrEmpty(overrideErrorMessage))
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat">
+                        @overrideErrorMessage
+                    </RadzenAlert>
+                }
+
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenButton Icon="send" 
+                                  ButtonStyle="ButtonStyle.Primary" 
+                                  Disabled="@isPublishingAssignment" 
+                                  Click="async () => { await PublishAssignmentAsync(isOverride: true); ds.Close(true); }"
+                                  data-testid="dispatch-override-send">
+                        @(isPublishingAssignment ? "Sending..." : "Send assignment")
+                    </RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" 
+                                  Icon="cancel" 
+                                  Click="() => ds.Close(false)"
+                                  data-testid="dispatch-override-cancel">
+                        Cancel
+                    </RadzenButton>
+                </RadzenStack>
+            </RadzenStack>,
+            new DialogOptions { 
+                Width = "500px",
+                Resizable = false,
+                Draggable = true
+            }
+        );
+
+        string dialogResult = result != null ? result.ToString() : "cancelled";
+        Logger.LogInformation("Override dialog closed with result: {Result}", dialogResult);
     }
 
     private async Task PublishAssignmentAsync(bool isOverride)
@@ -453,7 +493,6 @@
         {
             var receipt = await ApiClient.PublishAssignmentAsync(request);
             lastReceiptMessage = $"Assignment queued for {selectedRecommendation.Crew.DisplayName} (tracking {receipt.TrackingId}).";
-            CloseOverrideDialog();
             await LoadTicketsAsync(selectedTicket.Id);
             NotificationService.Notify(NotificationSeverity.Success, "Assignment queued", lastReceiptMessage);
             Logger.LogInformation("Assignment published for ticket {TicketId} with tracking {TrackingId}", selectedTicket.Id, receipt.TrackingId);
@@ -525,7 +564,8 @@
             lastReceiptMessage ??= "Crew status sent.";
             NotificationService.Notify(NotificationSeverity.Success, "Crew status sent", lastReceiptMessage);
             await LoadTicketsAsync(selectedTicket?.Id);
-            Logger.LogInformation("Crew status {Status} posted for crew {CrewId} on ticket {TicketId}", status, crewId, selectedTicket?.Id);
+            var ticketId = selectedTicket?.Id;
+            Logger.LogInformation("Crew status {Status} posted for crew {CrewId} on ticket {TicketId}", status, crewId, ticketId);
         }
         catch (Exception ex)
         {
@@ -574,6 +614,11 @@
     }
 
     private static string ToAriaBool(bool value) => value ? "true" : "false";
+
+    private static string GetTicketCardStyle(bool isActive) =>
+        isActive
+            ? "cursor: pointer; transition: all 0.2s ease; border: 2px solid var(--rz-primary); background: var(--rz-primary-lighter);"
+            : "cursor: pointer; transition: all 0.2s ease; border: 1px solid var(--rz-base-300); background: var(--rz-base-background-color);";
 
     private static string BuildTelemetryWarning(int staleCount) =>
         $"Telemetry stale for {staleCount} crew{(staleCount == 1 ? string.Empty : "s")}.";

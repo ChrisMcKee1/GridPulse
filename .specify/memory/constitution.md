@@ -68,7 +68,7 @@ Follow-up TODOs:
 
 ## Layer Constitutions
 
-- **UI Lite Constitution** – `UIS/constitution.md` captures Blazor-specific guardrails (typed clients, render mode discipline, accessibility). UI work MUST reference it plus this parent document.
+- **UI Lite Constitution** – `UIS/constitution.md` captures Blazor-specific guardrails (typed clients, render mode discipline, Radzen component requirements, accessibility). UI work MUST reference it plus this parent document. See also `docs/blazor-radzen-lessons-learned.md` for critical component usage patterns.
 - **API Lite Constitution** – `API/constitution.md` governs minimal API practices (routing, ProblemDetails, repository boundaries, telemetry). API changes MUST satisfy both constitutions.
 
 ## Workflow Expectations

@@ -19,18 +19,29 @@ Complete reference for GridPulse Blazor UI components, organized using Atomic De
 
 ## Overview
 
-The GridPulse UI is built with **Blazor Interactive Auto**, combining server-side rendering with WebAssembly for optimal performance. Components follow **Atomic Design** principles, creating a hierarchical component structure from simple to complex.
+The GridPulse UI is built with **Blazor** using Radzen components exclusively. Components follow **Atomic Design** principles, creating a hierarchical component structure from simple to complex.
 
 ### Technology Stack
-- **Blazor Interactive Auto** - Hybrid rendering mode
-- **Radzen Blazor Components** - UI component library
-- **CSS** - Custom styling
-- **Typed HTTP Client** - API integration
+- **Blazor Interactive Server** - Primary render mode for complex interactions
+- **Radzen Blazor Components** - UI component library (REQUIRED - no raw HTML allowed)
+- **CSS Design Tokens** - Theme-aware styling with CSS variables
+- **Typed HTTP Client** - API integration via `GridPulseApiClient`
+
+### Critical Component Rules
+
+⚠️ **NEVER use raw HTML elements** in Razor components. Always use Radzen equivalents:
+- `<h1>` → `<RadzenText TextStyle="TextStyle.H1" TagName="TagName.H1">`
+- `<p>` → `<RadzenText TextStyle="TextStyle.Body1">`
+- `<label>` → `<RadzenLabel Text="..." Component="field-id">`
+- `<div>` → `<RadzenStack>`, `<RadzenRow>`, `<RadzenColumn>`, or `<RadzenCard>`
+- `<ul>/<li>` → `<RadzenStack>` with child elements
+
+See [Blazor & Radzen Lessons Learned](blazor-radzen-lessons-learned.md) for detailed migration patterns.
 
 ### Render Modes
-- **Server**: Initial page load (fast first render)
-- **WebAssembly**: Client-side after initial load (interactive)
-- **Auto**: Blazor chooses optimal mode automatically
+- **InteractiveServer**: Required for pages with complex state/interactions (Dashboard, Tickets, DispatchBoard)
+- **InteractiveAuto**: Use sparingly - can cause hydration issues with Radzen components
+- **Static**: For simple content-only pages
 
 ---
 
@@ -71,65 +82,67 @@ Basic, reusable UI elements that cannot be broken down further.
 
 ### StatusChip
 
-Visual indicator for outage status with color coding.
+Visual indicator for outage/ticket status with color coding.
 
 **Location**: `GridPulse.Web/Components/Atoms/StatusChip.razor`
 
-**Purpose**: Display outage status with appropriate styling
+**Purpose**: Display status with appropriate Radzen badge styling
 
 **Parameters**:
 ```csharp
-[Parameter] public string Status { get; set; } = string.Empty;
+[Parameter] public string Label { get; set; } = string.Empty;
+[Parameter] public string Variant { get; set; } = "default";
 ```
 
-**Status Colors**:
-| Status | Color | Badge Style |
-|--------|-------|-------------|
-| Reported | Default/Gray | `Default` |
-| Acknowledged | Blue | `Info` |
-| CrewDispatched | Yellow | `Warning` |
-| Restored | Green | `Success` |
+**Status Variants**:
+| Variant | Badge Style | Use Case |
+|---------|-------------|----------|
+| success | `BadgeStyle.Success` | Resolved, Restored |
+| warning | `BadgeStyle.Warning` | Open, Pending |
+| info | `BadgeStyle.Info` | InProgress, Acknowledged |
+| danger | `BadgeStyle.Danger` | High Priority |
+| default | `BadgeStyle.Secondary` | Default state |
 
 **Usage**:
 ```razor
-<StatusChip Status="@outage.Status" />
+<StatusChip Label="@ticket.Status.ToString()" Variant="@GetStatusVariant(ticket.Status)" />
 ```
 
-**Renders**:
-- Radzen badge component
-- Capitalized status text
-- Color-coded background
+**Implementation**:
+- Uses `<RadzenBadge>` component (never `<span class="chip">`)
+- Supports `Variant.Flat` for modern styling
+- Text automatically formatted
 
 ---
 
-### KpiStat
+### KPI Cards
 
 Key Performance Indicator display with title, value, and trend.
 
-**Location**: `GridPulse.Web/Components/Atoms/KpiStat.razor`
+**Location**: Inline in `Dashboard.razor` (uses `RadzenCard` + `RadzenStack`)
 
 **Purpose**: Display important metrics on dashboard
 
-**Parameters**:
-```csharp
-[Parameter] public string Title { get; set; } = string.Empty;
-[Parameter] public string Value { get; set; } = string.Empty;
-[Parameter] public string Trend { get; set; } = string.Empty;
-```
-
-**Usage**:
+**Implementation Pattern**:
 ```razor
-<KpiStat 
-    Title="Active outages" 
-    Value="@ActiveOutages" 
-    Trend="75% crews engaged" />
+<RadzenCard class="kpi-card" Style="padding: var(--gp-space-xl); ...">
+    <RadzenStack Gap="var(--gp-space-sm)">
+        <span class="kpi-card__title">Open Tickets</span>
+        <div class="kpi-card__value-group">
+            <span class="kpi-card__value">@OpenTicketsCount</span>
+        </div>
+        <span class="kpi-card__trend">@HighPriorityCount high priority</span>
+    </RadzenStack>
+</RadzenCard>
 ```
 
-**Renders**:
-- Large, bold value
-- Descriptive title
-- Secondary trend information
-- Card-based layout
+**Design Tokens Used**:
+- `var(--gp-space-xl)` - Card padding
+- `var(--gp-space-sm)` - Internal gaps
+- `var(--gp-text-secondary)` - Title color
+- `var(--gp-text-primary)` - Value color
+
+**Note**: KPI cards use inline `<span>` for specific styled elements within `RadzenStack`. For semantic text, prefer `<RadzenText>`.
 
 ---
 
@@ -139,7 +152,7 @@ Composite components that combine multiple atoms or simple elements.
 
 ### OutageSummaryCard
 
-Card displaying outage summary with key details.
+Card displaying outage summary with key details using only Radzen components.
 
 **Location**: `GridPulse.Web/Components/Molecules/OutageSummaryCard.razor`
 
@@ -147,28 +160,25 @@ Card displaying outage summary with key details.
 
 **Parameters**:
 ```csharp
-[Parameter] public OutageSummaryResponse Outage { get; set; } = null!;
+[Parameter, EditorRequired] public OutageSummaryResponse Outage { get; set; } = default!;
 ```
 
-**Displays**:
-- Service address (heading)
-- Status badge (using `StatusChip`)
-- Reported timestamp
-- Last updated timestamp
-- Estimated restoration time
-- Cause description
-- Affected customer count
+**Displays** (all using Radzen components):
+- Service address: `<RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">`
+- Timestamp: `<RadzenText TextStyle="TextStyle.Caption">`
+- Status badge: `<StatusChip>`
+- ETA/Affected/Cause: `<RadzenLabel>` + `<RadzenText TextStyle="TextStyle.Subtitle1">`
 
 **Usage**:
 ```razor
 <OutageSummaryCard Outage="@outage" />
 ```
 
-**Features**:
-- Radzen card component
-- Formatted timestamps
-- Conditional display (ETA, Cause may be null)
-- Visual hierarchy
+**Critical Rules**:
+- ❌ No `<h4>`, `<small>`, `<strong>`, or `<span>` elements
+- ✅ Use `<RadzenText>` with appropriate `TextStyle` and `TagName`
+- ✅ Use `<RadzenLabel>` for field labels with `Style="font-size: 0.8rem; text-transform: uppercase;"`
+- Layout uses `<RadzenCard>` with nested `<div class="outage-card__header">` and `<div class="outage-card__body">`
 
 ---
 
@@ -749,37 +759,101 @@ The application uses Radzen's default theme with customizations.
    - Molecules: Combine 2-3 atoms
    - Organisms: Complex, feature-rich
    - Templates: Layout only
-   - Pages: Route endpoints
+   - Pages: Route endpoints with `@page` directive
 
 2. **Naming Conventions**:
    - PascalCase for component names
    - Descriptive, action-oriented names
-   - Suffix with component type (Card, Grid, etc.)
+   - Suffix with component type (Card, Grid, Panel, etc.)
 
 3. **Parameter Guidelines**:
    - Use `[Parameter]` attribute
-   - Provide default values
-   - Use null-forgiving operator (`= null!`) for required parameters
-   - Document expected values
+   - Use `[Parameter, EditorRequired]` for required parameters
+   - Provide default values: `= Array.Empty<T>()` or `= default!`
+   - Document expected values in XML comments
 
 4. **State Management**:
-   - Keep state in pages, not templates
+   - Keep state in pages, not templates/organisms
    - Pass data down via parameters
-   - Emit events up via EventCallback
+   - Emit events up via `EventCallback<T>`
+   - Use `CancellationTokenSource` for async operations that can be cancelled
+
+5. **Radzen Component Requirements** (CRITICAL):
+   - ❌ **NEVER** use raw HTML: `<h1>`, `<p>`, `<span>`, `<div>`, `<label>`, `<ul>`, `<li>`, `<button>`
+   - ✅ **ALWAYS** use Radzen equivalents:
+     - Text: `<RadzenText TextStyle="..." TagName="...">`
+     - Layout: `<RadzenStack>`, `<RadzenRow>`, `<RadzenColumn>`, `<RadzenSplitter>`
+     - Labels: `<RadzenLabel Text="..." Component="field-id">`
+     - Buttons: `<RadzenButton Icon="..." Click="...">`
+     - Badges: `<RadzenBadge BadgeStyle="..." Text="...">`
+     - Icons: `<RadzenIcon Icon="icon_name">`
+     - Forms: `<RadzenTemplateForm>` with `<DataAnnotationsValidator />`
+     - Modals: `DialogService.OpenAsync()` (never custom backdrop HTML)
+   - See [Blazor & Radzen Lessons Learned](blazor-radzen-lessons-learned.md) for migration examples
+
+### Render Mode Guidelines
+
+**Pages with Complex Interactions**:
+```razor
+@page "/tickets"
+@rendermode InteractiveServer
+```
+
+Use `InteractiveServer` for:
+- Pages with forms and validation
+- Real-time data updates
+- Complex state management
+- Radzen DataGrid with sorting/paging
+- Dialog interactions
+
+**Static Pages** (rare):
+```razor
+@page "/about"
+```
+
+Use static rendering only for:
+- Pure content pages
+- No user interaction required
+
+⚠️ **Avoid `InteractiveAuto`**: Can cause hydration issues with Radzen components. Use `InteractiveServer` instead.
 
 ### Example Component Template
 
 ```razor
-@* Atoms/ExampleAtom.razor *@
-<div class="example-atom">
-    <span>@Text</span>
-</div>
+@* Molecules/ExampleCard.razor *@
+<RadzenCard Style="padding: var(--gp-space-md);">
+    <RadzenStack Gap="var(--gp-space-sm)">
+        <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">@Title</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@Description</RadzenText>
+        @if (ShowBadge)
+        {
+            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@BadgeText" />
+        }
+    </RadzenStack>
+</RadzenCard>
 
 @code {
-    [Parameter] 
-    public string Text { get; set; } = string.Empty;
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = default!;
+    
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+    
+    [Parameter]
+    public bool ShowBadge { get; set; }
+    
+    [Parameter]
+    public string BadgeText { get; set; } = string.Empty;
 }
 ```
+
+**Key Points**:
+- Uses `<RadzenCard>` instead of `<div>`
+- Uses `<RadzenStack>` for layout with design token gaps
+- Uses `<RadzenText>` with proper `TextStyle` and `TagName`
+- Uses `<RadzenBadge>` instead of custom HTML
+- Required parameters use `[Parameter, EditorRequired]` and `= default!`
+- Optional parameters have sensible defaults
 
 ---
 
@@ -889,17 +963,64 @@ Planned component additions:
 
 ---
 
+## Pre-Implementation Checklist
+
+Before implementing new UI features:
+
+- [ ] Confirm all text uses `<RadzenText>` with appropriate `TextStyle` and `TagName`
+- [ ] Verify no raw HTML layout elements (`<div>`, `<ul>`, `<li>`, `<button>`)
+- [ ] Use `<RadzenStack>`/`<RadzenRow>`/`<RadzenColumn>` for all layout
+- [ ] Forms use `<RadzenTemplateForm>` with `<DataAnnotationsValidator />` and per-field `<ValidationMessage>`
+- [ ] Modals use `DialogService.OpenAsync()` instead of custom backdrop HTML
+- [ ] Render mode is `@rendermode InteractiveServer` for complex interactions (document why if using `InteractiveAuto`)
+- [ ] All spacing uses design tokens (`var(--gp-space-*)`, `var(--gp-radius-*)`, etc.)
+- [ ] Labels use `<RadzenLabel Text="..." Component="field-id">`
+- [ ] Badges/chips use `<RadzenBadge>` instead of custom `<span>` elements
+- [ ] Icons use `<RadzenIcon Icon="icon_name">` instead of `<i>` or `<span class="bi">`
+- [ ] Review [Blazor & Radzen Lessons Learned](blazor-radzen-lessons-learned.md) for migration patterns
+
+## Code Review Checklist
+
+When reviewing UI PRs:
+
+- [ ] No raw HTML text elements (`<h*>`, `<p>`, `<span>`, `<label>`, `<small>`, `<strong>`)
+- [ ] No manual layout divs (should use `<RadzenStack>`, `<RadzenRow>`, `<RadzenColumn>`, `<RadzenSplitter>`)
+- [ ] No hardcoded spacing (should use design tokens like `var(--gp-space-md)`)
+- [ ] Render mode is documented and justified (prefer `InteractiveServer`)
+- [ ] Forms have proper validation structure (`<RadzenTemplateForm>`, `<DataAnnotationsValidator />`, per-field `<ValidationMessage>`)
+- [ ] Dialogs use `DialogService.OpenAsync()` (no custom modal HTML)
+- [ ] All components are Radzen or have documented justification
+- [ ] Visual verification included (screenshots/Playwright recordings)
+- [ ] Component follows Atomic Design hierarchy (Atom/Molecule/Organism/Template/Page)
+- [ ] Parameters use `[Parameter, EditorRequired]` for required props
+- [ ] State is managed in pages, not in organisms/molecules
+- [ ] References UI Constitution (`UIS/constitution.md`) in PR description
+
 ## Testing Components
 
 ### Manual Testing
 
-1. Run the application: `aspire run`
-2. Navigate to components
-3. Test interactions
-4. Verify responsive behavior
+1. Run the application: `aspire run --project ./src/GridPulse.AppHost/GridPulse.AppHost.csproj`
+2. Navigate to components in browser
+3. Test interactions (clicks, form submissions, dialogs)
+4. Verify responsive behavior (desktop, tablet, mobile)
+5. Test dark/light mode (if theme toggle implemented)
+6. Test keyboard navigation and screen reader compatibility
 
-### Future Testing
+### Automated Testing
 
-- Unit tests with bUnit
-- E2E tests with Playwright
+**Unit Tests** (bUnit):
+- Component rendering tests in `GridPulse.Tests.Unit/Web/Components`
+- Mock `GridPulseApiClient` using `TestContext.Services`
+- Test parameter binding and event callbacks
+- Example: `ComponentTestBase` provides Radzen service mocks
+
+**Integration Tests** (Playwright):
+- E2E tests in `tests/GridPulse.Web.Tests.Playwright`
+- Test full user workflows (create ticket, dispatch assignment, etc.)
+- Use `data-testid` attributes for stable selectors
+
+**Future Testing**:
 - Visual regression testing
+- Accessibility audits (axe-core)
+- Performance profiling (Lighthouse)

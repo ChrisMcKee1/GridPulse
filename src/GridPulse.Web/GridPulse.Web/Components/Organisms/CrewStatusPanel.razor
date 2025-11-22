@@ -5,12 +5,12 @@
 <div class="crew-status-panel" data-testid="crew-status-panel">
     <div class="crew-status-panel__header">
         <div>
-            <h4>@(Crew?.DisplayName ?? "No crew assigned")</h4>
-            <p class="dispatch-subtitle">Monitor acknowledgements and simulate crew responses.</p>
+            <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">@(Crew?.DisplayName ?? "No crew assigned")</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Class="dispatch-subtitle">Monitor acknowledgements and simulate crew responses.</RadzenText>
         </div>
         @if (Crew is not null)
         {
-            <span class="crew-status-panel__badge">@Crew.Status</span>
+            <RadzenBadge Text="@Crew.Status.ToString()" BadgeStyle="BadgeStyle.Info" Class="crew-status-panel__badge" />
         }
     </div>
 
@@ -26,20 +26,29 @@
     <div class="crew-status-panel__details">
         @if (Crew is null)
         {
-            <p>Select a ticket with an assigned crew to enable status updates.</p>
+            <RadzenText TextStyle="TextStyle.Body2">Select a ticket with an assigned crew to enable status updates.</RadzenText>
         }
         else
         {
-            <ul>
-                <li><strong>Tickets:</strong> @Crew.CurrentTicketCount active</li>
-                <li><strong>Skills:</strong> @string.Join(", ", Crew.Skills)</li>
-                <li><strong>Last update:</strong> @Crew.LastStatusUpdate.ToLocalTime().ToString("g")</li>
-            </ul>
+            <RadzenStack Gap="8px">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="4px">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Tickets:</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">@Crew.CurrentTicketCount active</RadzenText>
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="4px">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Skills:</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">@string.Join(", ", Crew.Skills)</RadzenText>
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="4px">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Last update:</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">@Crew.LastStatusUpdate.ToLocalTime().ToString("g")</RadzenText>
+                </RadzenStack>
+            </RadzenStack>
         }
     </div>
 
     <div class="crew-status-panel__controls">
-        <label for="crew-status-select">Crew status</label>
+        <RadzenLabel Text="Crew status" Component="crew-status-select" />
         <select id="crew-status-select"
                 class="crew-status-panel__select"
                 data-testid="crew-status-select"

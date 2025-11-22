@@ -1,0 +1,48 @@
+@using Radzen
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<RadzenButton Click="@ToggleTheme" 
+              Variant="Variant.Text" 
+              ButtonStyle="ButtonStyle.Secondary"
+              Size="ButtonSize.Medium"
+              Style="min-width: 40px; padding: 0.5rem;"
+              Icon="@(isDarkMode ? "light_mode" : "dark_mode")"
+              title="@(isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")"
+              data-testid="theme-toggle-button" />
+
+@code {
+    private bool isDarkMode;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        
+        // Subscribe to theme changes (like RadzenLayout does)
+        ThemeService.ThemeChanged += OnThemeChanged;
+        
+        // Set initial state based on current theme
+        isDarkMode = ThemeService.Theme == "material-dark";
+    }
+
+    private void OnThemeChanged()
+    {
+        // Update icon state when theme changes
+        isDarkMode = ThemeService.Theme == "material-dark";
+        StateHasChanged();
+    }
+
+    private void ToggleTheme()
+    {
+        // Determine new theme based on CURRENT state, then set it
+        // The OnThemeChanged event will update isDarkMode
+        var newTheme = isDarkMode ? "material" : "material-dark";
+        ThemeService.SetTheme(newTheme);
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe to prevent memory leaks
+        ThemeService.ThemeChanged -= OnThemeChanged;
+    }
+}

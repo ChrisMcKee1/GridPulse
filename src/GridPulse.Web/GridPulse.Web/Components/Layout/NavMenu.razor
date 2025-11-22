@@ -1,31 +1,57 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Zava Power</a>
-    </div>
-</div>
+﻿@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()" style="background: var(--rz-base-background-color); border-right: 1px solid var(--rz-base-300);">
+    <nav class="nav flex-column" style="padding: 1rem 0.75rem;">
+        <div class="nav-item px-3" style="margin-bottom: 0.5rem;">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" style="border-radius: 8px; padding: 0.75rem; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem;">
+                <RadzenIcon Icon="dashboard" /> Dashboard
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="tickets">
-                <span class="bi bi-clipboard-check" aria-hidden="true"></span> Tickets
+        <div class="nav-item px-3" style="margin-bottom: 0.5rem;">
+            <NavLink class="nav-link" href="tickets" style="border-radius: 8px; padding: 0.75rem; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem;">
+                <RadzenIcon Icon="confirmation_number" /> Tickets
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="dispatch">
-                <span class="bi bi-lightning" aria-hidden="true"></span> Dispatch
+        <div class="nav-item px-3" style="margin-bottom: 0.5rem;">
+            <NavLink class="nav-link" href="dispatch" style="border-radius: 8px; padding: 0.75rem; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem;">
+                <RadzenIcon Icon="electric_bolt" /> Dispatch
             </NavLink>
         </div>
-
     </nav>
 </div>
 
+@code {
+    public async ValueTask DisposeAsync()
+    {
+        await ValueTask.CompletedTask;
+    }
+}
+
+<style>
+	.nav-link {
+		color: var(--rz-text-secondary-color) !important;
+		font-weight: 500;
+	}
+	
+	.nav-link:hover {
+		background: var(--rz-base-200) !important;
+		color: var(--rz-text-color) !important;
+	}
+	
+	.nav-link.active {
+		background: var(--rz-primary) !important;
+		color: white !important;
+		font-weight: 600;
+	}
+	
+	.theme-toggle:hover {
+		background: var(--rz-base-200) !important;
+		color: var(--rz-text-color) !important;
+	}
+</style>

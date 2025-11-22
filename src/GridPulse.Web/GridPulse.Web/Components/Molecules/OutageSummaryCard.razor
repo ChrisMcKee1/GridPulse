@@ -3,23 +3,23 @@
 <RadzenCard Class="outage-card">
     <div class="outage-card__header">
         <div>
-            <h4>@Outage.ServiceAddress</h4>
-            <small>@Outage.ReportedAt.ToLocalTime().ToString("f")</small>
+            <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">@Outage.ServiceAddress</RadzenText>
+            <RadzenText TextStyle="TextStyle.Caption">@Outage.ReportedAt.ToLocalTime().ToString("f")</RadzenText>
         </div>
         <StatusChip Label="@Outage.Status" Variant="@StatusVariant" />
     </div>
     <div class="outage-card__body">
         <div>
-            <span class="label">ETA</span>
-            <strong>@EtaText</strong>
+            <RadzenLabel Text="ETA" Style="font-size: 0.8rem; text-transform: uppercase;" />
+            <RadzenText TextStyle="TextStyle.Subtitle1">@EtaText</RadzenText>
         </div>
         <div>
-            <span class="label">Affected</span>
-            <strong>@Outage.AffectedCustomers</strong>
+            <RadzenLabel Text="Affected" Style="font-size: 0.8rem; text-transform: uppercase;" />
+            <RadzenText TextStyle="TextStyle.Subtitle1">@Outage.AffectedCustomers</RadzenText>
         </div>
         <div>
-            <span class="label">Cause</span>
-            <strong>@(Outage.Cause ?? "Investigating")</strong>
+            <RadzenLabel Text="Cause" Style="font-size: 0.8rem; text-transform: uppercase;" />
+            <RadzenText TextStyle="TextStyle.Subtitle1">@(Outage.Cause ?? "Investigating")</RadzenText>
         </div>
     </div>
 </RadzenCard>

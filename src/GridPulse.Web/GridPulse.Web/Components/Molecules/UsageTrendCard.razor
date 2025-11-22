@@ -4,17 +4,32 @@
 <RadzenCard Class="usage-card">
     <div class="usage-card__header">
         <div>
-            <span class="label">Usage</span>
-            <h4>@Title</h4>
+            <RadzenLabel Text="Usage" Style="font-size: 0.8rem; text-transform: uppercase;" />
+            <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H4">@Title</RadzenText>
         </div>
-        <span>@DateRange</span>
+        <RadzenText TextStyle="TextStyle.Body2">@DateRange</RadzenText>
     </div>
-    <RadzenChart Style="height:220px">
-        <RadzenCategoryAxis />
-        <RadzenValueAxis />
-        <RadzenLineSeries Data="Data"
+    <RadzenChart Style="height: 280px; width: 100%;">
+        <RadzenLineSeries Data="@Data"
                           CategoryProperty="Date"
-                          ValueProperty="KilowattHours" />
+                          Title="Usage"
+                          LineType="LineType.Solid"
+                          Smooth="true"
+                          Stroke="#2563EB"
+                          StrokeWidth="3"
+                          ValueProperty="KilowattHours">
+            <RadzenMarkers MarkerType="MarkerType.Circle" Fill="#2563EB" Size="6" />
+            <RadzenSeriesDataLabels Visible="false" />
+        </RadzenLineSeries>
+        <RadzenCategoryAxis Padding="20">
+            <RadzenGridLines Visible="true" LineType="LineType.Solid" />
+            <RadzenAxisTitle Text="" />
+        </RadzenCategoryAxis>
+        <RadzenValueAxis Formatter="@FormatAsKilowatt">
+            <RadzenGridLines Visible="true" LineType="LineType.Solid" />
+            <RadzenAxisTitle Text="kWh" />
+        </RadzenValueAxis>
+        <RadzenLegend Visible="false" />
     </RadzenChart>
 </RadzenCard>
 
@@ -22,4 +37,9 @@
     [Parameter] public string Title { get; set; } = "Demand";
     [Parameter] public string DateRange { get; set; } = string.Empty;
     [Parameter] public IReadOnlyList<UsageTrendPoint> Data { get; set; } = Array.Empty<UsageTrendPoint>();
+
+    string FormatAsKilowatt(object value)
+    {
+        return $"{value:N0} kWh";
+    }
 }

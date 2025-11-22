@@ -1,105 +1,343 @@
-﻿@page "/"
+@page "/"
 @using GridPulse.Web.Services.Models
+@using TicketDto = GridPulse.Web.Services.GridPulseApiClient.TicketDto
+@using TicketListResponse = GridPulse.Web.Services.GridPulseApiClient.TicketListResponse
 @inject GridPulse.Web.Services.GridPulseApiClient ApiClient
 
 <PageTitle>Zava Power · GridPulse</PageTitle>
 
-@if (isLoading)
-{
-	<RadzenSkeleton Width="100%" Height="320px" />
-}
-else if (outages.Count == 0)
-{
-	<RadzenAlert Severity="AlertSeverity.Info" Summary="All clear" Detail="There are no active outages at the moment." />
-}
-else
-{
-	<DashboardTemplate>
-		<PrimaryKpis>
-			<KpiStat Title="Active outages" Value="@ActiveOutages" Trend="@CrewCoverage" />
-			<KpiStat Title="Customers impacted" Value="@ImpactedCustomers" Trend="@RestorationEta" />
-			<KpiStat Title="Crews dispatched" Value="@CrewsDispatched" Trend="@DispatchTrend" />
-		</PrimaryKpis>
-		<HeroContent>
-			<UsageTrendCard Title="Daily demand" DateRange="@UsageRange" Data="@usageTrend" />
-			<RadzenStack Orientation="Orientation.Vertical" Gap="16">
-				@foreach (var outage in topOutages)
-				{
-					<OutageSummaryCard Outage="@outage" />
-				}
+<RadzenStack Gap="2rem" class="dashboard-template" Style="padding: 1.5rem;">
+	@if (isLoading)
+	{
+		<RadzenStack Gap="1.5rem">
+			<RadzenSkeleton Width="100%" Height="140px" Style="border-radius: 8px;" />
+			<RadzenRow Gap="1rem">
+				<RadzenColumn Size="12" SizeMD="4"><RadzenSkeleton Height="160px" Style="border-radius: 8px;" /></RadzenColumn>
+				<RadzenColumn Size="12" SizeMD="4"><RadzenSkeleton Height="160px" Style="border-radius: 8px;" /></RadzenColumn>
+				<RadzenColumn Size="12" SizeMD="4"><RadzenSkeleton Height="160px" Style="border-radius: 8px;" /></RadzenColumn>
+			</RadzenRow>
+			<RadzenSkeleton Width="100%" Height="400px" Style="border-radius: 8px;" />
+		</RadzenStack>
+	}
+	else if (tickets.Items.Count == 0 && outages.Count == 0)
+	{
+		<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300);">
+			<RadzenAlert Severity="AlertSeverity.Info" 
+						 Variant="Variant.Flat"
+						 AlertStyle="AlertStyle.Info"
+						 Shade="Shade.Lighter">
+				<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+					<RadzenIcon Icon="check_circle" Style="font-size: 2.5rem; color: var(--rz-success);" />
+						<div>
+							<RadzenText TextStyle="TextStyle.Subtitle1" Style="display: block; margin-bottom: 0.5rem;">All Clear</RadzenText>
+							<RadzenText TextStyle="TextStyle.Body2">There are no active tickets or outages at the moment. Grid is operating normally.</RadzenText>
+					</div>
+				</RadzenStack>
+			</RadzenAlert>
+		</RadzenCard>
+	}
+	else
+	{
+		<!-- Hero Header Section -->
+		<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+			<RadzenStack Orientation="Orientation.Horizontal" 
+						 JustifyContent="JustifyContent.SpaceBetween" 
+						 AlignItems="AlignItems.Center" 
+						 Wrap="FlexWrap.Wrap"
+						 Gap="1rem">
+				<RadzenStack Gap="0.5rem">
+					<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" Style="margin: 0;">Grid Operations Dashboard</RadzenText>
+					<RadzenText TextStyle="TextStyle.Body2" Style="margin: 0;">Real-time monitoring and ticket management</RadzenText>
+				</RadzenStack>
+				<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+					<RadzenBadge BadgeStyle="BadgeStyle.Danger" Variant="Variant.Flat" Text="@ActiveTickets" Style="font-size: 1.25rem; padding: 0.5rem 1rem;" />
+					<span style="color: var(--rz-text-secondary-color); font-weight: 500;">Active Tickets</span>
+				</RadzenStack>
 			</RadzenStack>
-		</HeroContent>
-		<DetailContent>
-			<OutageGrid Outages="@outages" />
-			<OutageActivityTimeline Items="@activity" />
-		</DetailContent>
-	</DashboardTemplate>
-}
+		</RadzenCard>
+
+		<!-- KPI Cards Grid -->
+		<RadzenRow Gap="1rem">
+			<RadzenColumn Size="12" SizeMD="3">
+				<RadzenCard class="kpi-card" Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+					<RadzenStack Gap="0.5rem">
+						<span class="kpi-card__title" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Open Tickets</span>
+						<div class="kpi-card__value-group">
+							<span class="kpi-card__value" style="font-size: 2.5rem; font-weight: 700; color: var(--rz-text-color); line-height: 1;">@OpenTicketsCount</span>
+						</div>
+						<span class="kpi-card__trend" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; margin-top: 0.5rem;">@HighPriorityCount high priority</span>
+					</RadzenStack>
+				</RadzenCard>
+			</RadzenColumn>
+			<RadzenColumn Size="12" SizeMD="3">
+				<RadzenCard class="kpi-card" Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+					<RadzenStack Gap="0.5rem">
+						<span class="kpi-card__title" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">In Progress</span>
+						<div class="kpi-card__value-group">
+							<span class="kpi-card__value" style="font-size: 2.5rem; font-weight: 700; color: var(--rz-text-color); line-height: 1;">@InProgressCount</span>
+						</div>
+						<span class="kpi-card__trend" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; margin-top: 0.5rem;">@CrewsAssignedCount crews assigned</span>
+					</RadzenStack>
+				</RadzenCard>
+			</RadzenColumn>
+			<RadzenColumn Size="12" SizeMD="3">
+				<RadzenCard class="kpi-card" Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+					<RadzenStack Gap="0.5rem">
+						<span class="kpi-card__title" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Customers Impacted</span>
+						<div class="kpi-card__value-group">
+							<span class="kpi-card__value" style="font-size: 2.5rem; font-weight: 700; color: var(--rz-text-color); line-height: 1;">@TotalCustomerImpact</span>
+						</div>
+						<span class="kpi-card__trend" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; margin-top: 0.5rem;">across all tickets</span>
+					</RadzenStack>
+				</RadzenCard>
+			</RadzenColumn>
+			<RadzenColumn Size="12" SizeMD="3">
+				<RadzenCard class="kpi-card" Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+					<RadzenStack Gap="0.5rem">
+						<span class="kpi-card__title" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Resolved Today</span>
+						<div class="kpi-card__value-group">
+							<span class="kpi-card__value" style="font-size: 2.5rem; font-weight: 700; color: var(--rz-success); line-height: 1;">@ResolvedTodayCount</span>
+						</div>
+						<span class="kpi-card__trend" style="color: var(--rz-text-secondary-color); font-size: 0.875rem; margin-top: 0.5rem;">@AvgResolutionTime avg time</span>
+					</RadzenStack>
+				</RadzenCard>
+			</RadzenColumn>
+		</RadzenRow>
+
+		<!-- Main Content Grid -->
+		<RadzenRow Gap="1rem">
+			<!-- Left Column: Charts -->
+			<RadzenColumn Size="12" SizeLG="8">
+				<RadzenStack Gap="1rem">
+					<!-- Ticket Timeline Chart -->
+					<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+						<RadzenStack Gap="0.75rem">
+							<div style="display: flex; justify-content: space-between; align-items: center;">
+								<RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Style="margin: 0;">Ticket Activity (Last 7 Days)</RadzenText>
+							</div>
+							<div style="height: 300px; display: flex; align-items: flex-end; justify-content: space-around; gap: 0.5rem; padding: 1rem 0;">
+								@foreach (var day in ticketTimeline)
+								{
+									var barHeight = day.Count == 0 ? 0 : Math.Max((day.Count * 100.0 / (ticketTimeline.Max(t => t.Count) + 1)), 10);
+									<div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+										<div style="width: 100%; background: var(--rz-primary); border-radius: 4px; height: @(barHeight)%; min-height: 4px; display: flex; align-items: center; justify-content: center;">
+											@if (day.Count > 0)
+											{
+												<span style="color: white; font-size: 0.75rem; font-weight: 600;">@day.Count</span>
+											}
+										</div>
+										<span style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">@day.Date</span>
+									</div>
+								}
+							</div>
+						</RadzenStack>
+					</RadzenCard>
+
+					<!-- Priority Distribution -->
+					<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+						<RadzenStack Gap="0.75rem">
+							<div style="display: flex; justify-content: space-between; align-items: center;">
+								<RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Style="margin: 0;">Priority Distribution</RadzenText>
+							</div>
+							<RadzenStack Gap="0.75rem">
+								@foreach (var priority in priorityDistribution)
+								{
+									var percentage = tickets.Items.Count == 0 ? 0 : (priority.Count * 100.0 / tickets.Items.Count);
+									var barColor = priority.Priority switch {
+										"High" => "#EF4444",
+										"Medium" => "#F59E0B",
+										"Low" => "#10B981",
+										_ => "#6B7280"
+									};
+									<div>
+										<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+											<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+												<div style="width: 12px; height: 12px; border-radius: 50%; background: @barColor;"></div>
+												<span style="font-weight: 500; color: var(--rz-text-color);">@priority.Priority</span>
+											</RadzenStack>
+											<span style="font-weight: 600; color: var(--rz-text-color);">@priority.Count (@percentage.ToString("F0")%)</span>
+										</div>
+										<div style="width: 100%; height: 24px; background: var(--rz-base-200); border-radius: 4px; overflow: hidden;">
+											<div style="height: 100%; background: @barColor; width: @(percentage)%; transition: width 0.3s ease;"></div>
+										</div>
+									</div>
+								}
+							</RadzenStack>
+						</RadzenStack>
+					</RadzenCard>
+				</RadzenStack>
+			</RadzenColumn>
+
+			<!-- Right Column: Status Summary & Recent Tickets -->
+			<RadzenColumn Size="12" SizeLG="4">
+				<RadzenStack Gap="1rem">
+					<!-- Status Summary -->
+					<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+						<RadzenStack Gap="1rem">
+							<div style="display: flex; justify-content: space-between; align-items: center;">
+								<RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Style="margin: 0;">Status Overview</RadzenText>
+							</div>
+							<RadzenStack Gap="0.75rem">
+								@foreach (var status in statusBreakdown)
+								{
+									<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-radius: 8px; background: var(--rz-base-200);">
+										<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+											<RadzenBadge BadgeStyle="@GetStatusBadgeStyle(status.Status)" Variant="Variant.Flat" Style="width: 8px; height: 8px; padding: 0;" />
+											<span style="font-weight: 500; color: var(--rz-text-color);">@status.Status</span>
+										</RadzenStack>
+										<span style="font-size: 1.5rem; font-weight: 700; color: var(--rz-text-color);">@status.Count</span>
+									</div>
+								}
+							</RadzenStack>
+						</RadzenStack>
+					</RadzenCard>
+
+					<!-- Recent High Priority Tickets -->
+					<RadzenCard Style="padding: 1.5rem; border-radius: 8px; border: 1px solid var(--rz-base-300); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+						<RadzenStack Gap="1rem">
+							<div style="display: flex; justify-content: space-between; align-items: center;">
+								<RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Style="margin: 0;">High Priority</RadzenText>
+								<RadzenBadge BadgeStyle="BadgeStyle.Danger" Variant="Variant.Flat" Text="@highPriorityTickets.Count.ToString()" />
+							</div>
+							<RadzenStack Gap="0.5rem">
+								@foreach (var ticket in highPriorityTickets.Take(5))
+								{
+									<div style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--rz-base-300); background: var(--rz-base-100);">
+										<RadzenStack Gap="0.5rem">
+											<div style="display: flex; justify-content: space-between; align-items: start;">
+												<span style="font-weight: 600; color: var(--rz-text-color); font-size: 0.875rem;">@ticket.Title</span>
+												<RadzenBadge BadgeStyle="@GetPriorityBadgeStyle(ticket.Priority)" Text="@ticket.Priority" Variant="Variant.Flat" Style="font-size: 0.75rem;" />
+											</div>
+											<div style="display: flex; justify-content: space-between; align-items: center;">
+												<span style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">@ticket.OpenedAt.ToLocalTime().ToString("MMM d, h:mm tt")</span>
+												@if (ticket.CustomerImpact > 0)
+												{
+													<span style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">@ticket.CustomerImpact customers</span>
+												}
+											</div>
+										</RadzenStack>
+									</div>
+								}
+							</RadzenStack>
+						</RadzenStack>
+					</RadzenCard>
+				</RadzenStack>
+			</RadzenColumn>
+		</RadzenRow>
+	}
+</RadzenStack>
 
 @code {
 	private IReadOnlyList<OutageSummaryResponse> outages = Array.Empty<OutageSummaryResponse>();
-	private IReadOnlyList<OutageSummaryResponse> topOutages = Array.Empty<OutageSummaryResponse>();
-	private IReadOnlyList<UsageTrendPoint> usageTrend = Array.Empty<UsageTrendPoint>();
-	private IReadOnlyList<OutageActivityItem> activity = Array.Empty<OutageActivityItem>();
+	private TicketListResponse tickets = new(Array.Empty<TicketDto>(), 0);
+	private List<TicketDto> highPriorityTickets = new();
+	private List<TimelinePoint> ticketTimeline = new();
+	private List<PriorityPoint> priorityDistribution = new();
+	private List<StatusPoint> statusBreakdown = new();
 	private bool isLoading = true;
 
-	private string ActiveOutages => outages.Count(o => !string.Equals(o.Status, "Resolved", StringComparison.OrdinalIgnoreCase)).ToString("N0");
-	private string ImpactedCustomers => outages.Sum(o => o.AffectedCustomers).ToString("N0");
-	private string CrewsDispatched => outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)).ToString("N0");
-
-	private string CrewCoverage => $"{CrewDeploymentPercentage:P0} crews engaged";
-	private string RestorationEta => $"{UpcomingRestorations} restorations due in 2h";
-	private string DispatchTrend => $"{DispatchDelta:+#;-#;0} vs yesterday";
-	private string UsageRange => $"{DateTime.Today.AddDays(-usageTrend.Count + 1):MMM d} – {DateTime.Today:MMM d}";
-
-	private double CrewDeploymentPercentage => outages.Count == 0
-		? 0
-		: (double)outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)) / outages.Count;
-
-	private int UpcomingRestorations => outages.Count(o => o.EstimatedRestoration is not null && o.EstimatedRestoration <= DateTimeOffset.UtcNow.AddHours(2));
-
-	private int DispatchDelta => Math.Clamp(outages.Count(o => string.Equals(o.Status, "CrewDispatched", StringComparison.OrdinalIgnoreCase)) - 3, -9, 9);
+	// KPI Computed Properties
+	private string ActiveTickets => tickets.Items.Count(t => t.Status != "Resolved" && t.Status != "Closed").ToString("N0");
+	private string OpenTicketsCount => tickets.Items.Count(t => t.Status == "Open").ToString("N0");
+	private string InProgressCount => tickets.Items.Count(t => t.Status == "InProgress").ToString("N0");
+	private string TotalCustomerImpact => tickets.Items.Sum(t => t.CustomerImpact).ToString("N0");
+	private string ResolvedTodayCount => tickets.Items.Count(t => t.ClosedAt.HasValue && t.ClosedAt.Value.Date == DateTime.Today).ToString("N0");
+	private string HighPriorityCount => tickets.Items.Count(t => t.Priority == "High").ToString("N0");
+	private string CrewsAssignedCount => tickets.Items.Count(t => t.AssignedCrewId.HasValue).ToString("N0");
+	
+	private string AvgResolutionTime
+	{
+		get
+		{
+			var resolvedToday = tickets.Items.Where(t => t.ClosedAt.HasValue && t.ClosedAt.Value.Date == DateTime.Today).ToList();
+			if (resolvedToday.Count == 0) return "N/A";
+			var avgMinutes = resolvedToday.Average(t => (t.ClosedAt!.Value - t.OpenedAt).TotalMinutes);
+			if (avgMinutes < 60) return $"{avgMinutes:F0}m";
+			return $"{avgMinutes / 60:F1}h";
+		}
+	}
 
 	protected override async Task OnInitializedAsync()
 	{
-		outages = await ApiClient.GetRecentOutagesAsync();
-		topOutages = outages
-			.OrderByDescending(o => o.AffectedCustomers)
-			.ThenByDescending(o => o.ReportedAt)
-			.Take(3)
-			.ToArray();
-		usageTrend = BuildUsageTrend(outages);
-		activity = BuildActivity(outages);
-		isLoading = false;
+		try
+		{
+			var ticketsTask = ApiClient.GetAllTicketsAsync();
+			var outagesTask = ApiClient.GetRecentOutagesAsync();
+			
+			await Task.WhenAll(ticketsTask, outagesTask);
+			
+			tickets = await ticketsTask;
+			outages = await outagesTask;
+			
+			ProcessTicketData();
+		}
+		finally
+		{
+			isLoading = false;
+		}
 	}
 
-	private static IReadOnlyList<UsageTrendPoint> BuildUsageTrend(IEnumerable<OutageSummaryResponse> source)
+	private void ProcessTicketData()
 	{
-		var baseline = Math.Max(source.Sum(o => o.AffectedCustomers) / 25m, 50m);
+		// High priority tickets
+		highPriorityTickets = tickets.Items
+			.Where(t => t.Priority == "High" && t.Status != "Resolved" && t.Status != "Closed")
+			.OrderByDescending(t => t.OpenedAt)
+			.ToList();
+
+		// Timeline: tickets created per day for last 7 days
 		var today = DateTime.Today;
-		return Enumerable.Range(0, 14)
-			.Select(offset => new UsageTrendPoint(today.AddDays(-13 + offset), baseline + (decimal)Math.Sin(offset / 2d) * 15))
-			.ToArray();
+		ticketTimeline = Enumerable.Range(0, 7)
+			.Select(offset =>
+			{
+				var date = today.AddDays(-6 + offset);
+				var count = tickets.Items.Count(t => t.OpenedAt.Date == date);
+				return new TimelinePoint(date.ToString("MMM d"), count);
+			})
+			.ToList();
+
+		// Priority distribution
+		priorityDistribution = tickets.Items
+			.GroupBy(t => t.Priority)
+			.Select(g => new PriorityPoint(g.Key, g.Count()))
+			.OrderByDescending(p => GetPriorityOrder(p.Priority))
+			.ToList();
+
+		// Status breakdown
+		statusBreakdown = tickets.Items
+			.GroupBy(t => t.Status)
+			.Select(g => new StatusPoint(g.Key, g.Count()))
+			.OrderByDescending(s => s.Count)
+			.ToList();
 	}
 
-	private static IReadOnlyList<OutageActivityItem> BuildActivity(IEnumerable<OutageSummaryResponse> source)
+	private int GetPriorityOrder(string priority) => priority switch
 	{
-		return source
-			.OrderByDescending(o => o.LastUpdatedAt)
-			.Take(6)
-			.Select(o => new OutageActivityItem(
-				o.ServiceAddress,
-				o.Cause ?? "Investigation ongoing",
-				o.LastUpdatedAt,
-				ToVariant(o.Status)))
-			.ToArray();
-	}
-
-	private static string ToVariant(string status) => status switch
-	{
-		"Resolved" => "Success",
-		"CrewDispatched" => "Warning",
-		"Acknowledged" => "Info",
-		_ => "Default"
+		"High" => 3,
+		"Medium" => 2,
+		"Low" => 1,
+		_ => 0
 	};
+
+	private BadgeStyle GetStatusBadgeStyle(string status) => status switch
+	{
+		"Open" => BadgeStyle.Warning,
+		"InProgress" => BadgeStyle.Info,
+		"Resolved" => BadgeStyle.Success,
+		"Closed" => BadgeStyle.Secondary,
+		_ => BadgeStyle.Light
+	};
+
+	private BadgeStyle GetPriorityBadgeStyle(string priority) => priority switch
+	{
+		"High" => BadgeStyle.Danger,
+		"Medium" => BadgeStyle.Warning,
+		"Low" => BadgeStyle.Success,
+		_ => BadgeStyle.Secondary
+	};
+
+	private record TimelinePoint(string Date, int Count);
+	private record PriorityPoint(string Priority, int Count);
+	private record StatusPoint(string Status, int Count);
 }
+

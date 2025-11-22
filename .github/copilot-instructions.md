@@ -23,6 +23,29 @@
 - Blazor UI uses Radzen components plus typed data clients. Any network call must go through `GridPulse.Web/GridPulse.Web/Services/GridPulseApiClient.cs` + corresponding extension methods so the base URL + auth logic stay centralized; never spin up raw `HttpClient` inside components.
 - Styling belongs in `GridPulse.Web/wwwroot/app.css`; follow existing ticket styles (`.tickets-page`, `.tickets-detail-card`) when introducing new UI to keep the operator/dispatcher experiences cohesive.
 
+## Blazor & Radzen Component Rules (CRITICAL)
+- **NEVER use raw HTML elements** (`<h1>`, `<p>`, `<span>`, `<div>`, `<label>`, `<ul>`, `<li>`) in Razor components. Always use Radzen equivalents:
+  - `<h1>` → `<RadzenText TextStyle="TextStyle.H1" TagName="TagName.H1">`
+  - `<h2>` → `<RadzenText TextStyle="TextStyle.H2" TagName="TagName.H2">`
+  - `<h3>`, `<h4>` → `<RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">` (use appropriate TextStyle)
+  - `<p>` → `<RadzenText TextStyle="TextStyle.Body1">` or `TextStyle.Body2`
+  - `<span>` → `<RadzenText>` with appropriate TextStyle
+  - `<label>` → `<RadzenLabel Text="..." Component="field-id" />`
+  - `<small>` → `<RadzenText TextStyle="TextStyle.Caption">`
+  - `<strong>` → `<RadzenText TextStyle="TextStyle.Subtitle1">` or `TextStyle.Subtitle2`
+  - `<ul>`, `<li>` → `<RadzenStack>` with child `<RadzenStack>` or `<RadzenCard>` elements
+- **Render Mode**: Use `@rendermode InteractiveServer` for pages with complex state/interactions; `InteractiveAuto` causes hydration issues with Radzen components.
+- **Layout Components**: Always use `RadzenStack`, `RadzenRow`, `RadzenColumn`, `RadzenSplitter` for structure—never bare `<div>` containers:
+  - Vertical layout: `<RadzenStack Gap="...">`
+  - Horizontal layout: `<RadzenStack Orientation="Orientation.Horizontal">`
+  - Grid layout: `<RadzenRow Gap="..."><RadzenColumn Size="12" SizeMD="6">...</RadzenColumn></RadzenRow>`
+  - Resizable split panels: `<RadzenSplitter Orientation="Orientation.Horizontal"><RadzenSplitterPane>...</RadzenSplitterPane></RadzenSplitter>`
+- **Modals/Dialogs**: Use `DialogService.OpenAsync()` with Radzen components inside the template—never create custom backdrop/modal HTML.
+- **Forms**: Use `<RadzenTemplateForm>` with `<DataAnnotationsValidator />` and individual `<ValidationMessage For="@(() => model.Property)" />` per field.
+- **Lists**: Replace `<ul>`/`<li>` with `<RadzenStack>` containing `<RadzenCard>` or nested `<RadzenStack>` items.
+- **Badges/Chips**: Use `<RadzenBadge>` instead of custom `<span class="chip">` elements.
+- **Icons**: Use `<RadzenIcon Icon="icon_name" />` instead of `<span class="bi bi-...">`.
+
 ## Testing & Quality Bars
 - When adding services or DTO mappers, add matching unit tests under `GridPulse.Tests.Unit/Application` or `…/Web/Services`. Component tests should inherit from `ComponentTestBase` so Radzen services and JSInterop mocks are registered.
 - API contract coverage goes in `GridPulse.Tests.Unit/WebApi/*Tests.cs` using `WebApplicationFactory<Program>`. Seed data must support these tests, so update `TicketSeed` when new workflows need deterministic fixtures.
