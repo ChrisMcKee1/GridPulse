@@ -12,14 +12,9 @@ internal static class DatabaseInitializationExtensions
         await using var scope = services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<GridPulseDbContext>();
         var database = context.Database;
-        if (database.IsRelational())
-        {
-            await database.MigrateAsync(cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
-        }
+        
+        // Always use EnsureCreated for development (no migrations)
+        await database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
 
         var seeders = scope.ServiceProvider.GetServices<IDataSeeder>();
         foreach (var seeder in seeders)

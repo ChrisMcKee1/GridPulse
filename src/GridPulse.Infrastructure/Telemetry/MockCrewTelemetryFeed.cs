@@ -29,14 +29,14 @@ internal sealed class MockCrewTelemetryFeed : BackgroundService, ITelemetryFeedM
 
     public MockCrewTelemetryFeed(
         IServiceScopeFactory scopeFactory,
-        IOptions<TicketSeedOptions> options,
+        IOptions<UtilitySampleDataOptions> options,
         ILogger<MockCrewTelemetryFeed> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
-        _cadence = options.Value.TelemetryCadence <= TimeSpan.Zero
+        _cadence = options.Value.TelemetryStaleness <= TimeSpan.Zero
             ? TimeSpan.FromSeconds(60)
-            : options.Value.TelemetryCadence;
+            : options.Value.TelemetryStaleness;
         _samplesCounter = _meter.CreateCounter<int>("gridpulse.telemetry.samples");
         _latencyHistogram = _meter.CreateHistogram<double>("gridpulse.telemetry.latency", unit: "ms");
     }

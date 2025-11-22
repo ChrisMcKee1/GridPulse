@@ -10,6 +10,7 @@
 @using Radzen
 @inject GridPulseApiClient ApiClient
 @inject NotificationService NotificationService
+@inject TooltipService TooltipService
 @inject ILogger<Tickets> Logger
 @implements IDisposable
 
@@ -21,7 +22,7 @@
 			<RadzenText TextStyle="TextStyle.Body2" Class="tickets-subtitle">Monitor outage tickets, review duplicates, and advance workflow states</RadzenText>
 		</RadzenStack>
 
-		<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">\
+		<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
 			<RadzenButton Icon="refresh" 
 						  Variant="Variant.Outlined"
 						  Click="async () => await LoadTicketsAsync()" 
@@ -53,7 +54,8 @@
 		<RadzenStack Gap="0.75rem">
 			<RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" Wrap="FlexWrap.Wrap" AlignItems="AlignItems.End">
 				<RadzenStack Gap="0.5rem" Style="min-width: 200px;">
-					<label class="tickets-filter-label">Status</label>
+					<RadzenLabel Text="Status" Component="status-filter" 
+								 MouseEnter="@ShowStatusTooltip" />
 					<RadzenDropDown Data="@statusOptions" 
 								   TItem="DropdownOption<TicketStatus>" 
 								   TValue="IEnumerable<TicketStatus>" 
@@ -63,11 +65,13 @@
 								   AllowClear="true" 
 								   Chips="true"
 								   Style="width: 100%;"
+								   Name="status-filter"
 								   @bind-Value="StatusFilter" 
-								   Change="async _ => await ApplyFiltersAsync()" />
+								   Change="OnStatusFilterChanged" />
 				</RadzenStack>
 				<RadzenStack Gap="0.5rem" Style="min-width: 180px;">
-					<label class="tickets-filter-label">Minimum Priority</label>
+					<RadzenLabel Text="Minimum Priority" Component="min-priority-filter" 
+								 MouseEnter="@ShowPriorityTooltip" />
 					<RadzenDropDown Data="@priorityOptions" 
 								   TItem="DropdownOption<TicketPriority>" 
 								   TValue="TicketPriority?" 
@@ -76,16 +80,19 @@
 								   AllowClear="true" 
 								   Placeholder="Any" 
 								   Style="width: 100%;"
+								   Name="min-priority-filter"
 								   @bind-Value="minPriority" 
 								   Change="async _ => await ApplyFiltersAsync()" />
 				</RadzenStack>
 				<RadzenStack Gap="0.5rem">
-					<label class="tickets-filter-label">Include Timeline</label>
-					<RadzenSwitch @bind-Value="includeTimeline" Change="async _ => await ApplyFiltersAsync()" />
+					<RadzenLabel Text="Include Timeline" Component="include-timeline-toggle" 
+								 MouseEnter="@ShowTimelineTooltip" />
+					<RadzenSwitch @bind-Value="includeTimeline" Name="include-timeline-toggle" Change="async _ => await ApplyFiltersAsync()" />
 				</RadzenStack>
-				<RadzenStack Gap="0.5rem">
-					<label class="tickets-filter-label">Include Recommendations</label>
-					<RadzenSwitch @bind-Value="includeRecommendations" Change="async _ => await ApplyFiltersAsync()" />
+				<RadzenStack Gap="0.5rem" AlignItems="AlignItems.Start">
+					<RadzenLabel Text="Include Recommendations" Component="include-recommendations-toggle" 
+								 MouseEnter="@ShowRecommendationsHelpTooltip" />
+					<RadzenSwitch @bind-Value="includeRecommendations" Name="include-recommendations-toggle" Change="async _ => await ApplyFiltersAsync()" />
 				</RadzenStack>
 			</RadzenStack>
 		</RadzenStack>
@@ -114,14 +121,14 @@
 						</RadzenColumn>
 						<RadzenColumn Size="12" SizeMD="6">
 							<RadzenStack Gap="0.25rem">
-								<RadzenDropDown Data="@priorityOptions" TItem="DropdownOption<TicketPriority>" TValue="TicketPriority" ValueProperty="Value" TextProperty="Label"
-												Style="width:100%" @bind-Value="createModel.Priority" Name="Priority" aria-label="Priority" />
+								<RadzenDropDown Data="@priorityOptions" TItem="DropdownOption<TicketPriority>" TValue="TicketPriority?" ValueProperty="Value" TextProperty="Label"
+												Style="width:100%" @bind-Value="createModel.Priority" Placeholder="Select priority level" Name="Priority" aria-label="Priority" />
 								<ValidationMessage For="@(() => createModel.Priority)" />
 							</RadzenStack>
 						</RadzenColumn>
 						<RadzenColumn Size="12" SizeMD="6">
 							<RadzenStack Gap="0.25rem">
-								<RadzenNumeric TValue="int" @bind-Value="createModel.CustomerImpact" Min="0" Style="width:100%" Placeholder="Impacted customers" Name="CustomerImpact" aria-label="Customer impact" />
+								<RadzenNumeric TValue="int?" @bind-Value="createModel.CustomerImpact" Min="0" Style="width:100%" Placeholder="Number of impacted customers" Name="CustomerImpact" aria-label="Customer impact" ShowUpDown="false" />
 								<ValidationMessage For="@(() => createModel.CustomerImpact)" />
 							</RadzenStack>
 						</RadzenColumn>
@@ -153,7 +160,11 @@
 					}
 					else if (tickets.Count == 0)
 					{
-						<p>No tickets match the selected filters.</p>
+						<RadzenStack Gap="1rem" Style="padding: 2rem; text-align: center;" AlignItems="AlignItems.Center">
+							<RadzenIcon Icon="search_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+							<RadzenText TextStyle="TextStyle.Body1">No tickets match the selected filters.</RadzenText>
+							<RadzenText TextStyle="TextStyle.Body2">Try adjusting your filter criteria or clearing all filters.</RadzenText>
+						</RadzenStack>
 					}
 					else
 					{
@@ -358,6 +369,18 @@
 		}
 	}
 
+	private async Task OnStatusFilterChanged(object value)
+	{
+		// Radzen can set the value to null when clearing a multiple dropdown
+		// Ensure StatusFilter is always a valid collection to prevent dropdown breaking
+		if (StatusFilter is null)
+		{
+			StatusFilter = new List<TicketStatus>();
+			Logger.LogInformation("Status filter cleared, resetting to empty collection");
+		}
+		await ApplyFiltersAsync();
+	}
+
 	private async Task ApplyFiltersAsync()
 	{
 		Logger.LogInformation("Applying ticket filters: statuses={Statuses}, minPriority={MinPriority}, includeTimeline={IncludeTimeline}, includeRecommendations={IncludeRecommendations}",
@@ -405,8 +428,8 @@
 				Title = createModel.Title,
 				OutageReferenceId = createModel.OutageReferenceId,
 				Description = createModel.Description,
-				Priority = createModel.Priority,
-				CustomerImpact = createModel.CustomerImpact,
+				Priority = createModel.Priority ?? TicketPriority.Medium,
+				CustomerImpact = createModel.CustomerImpact ?? 0,
 				AffectedAssets = ParseAssets(createModel.AssetsInput)
 			};
 
@@ -508,6 +531,18 @@
 		Logger.LogInformation("Ticket selection reset to first ticket {TicketId}", selectedTicket?.Id);
 	}
 
+	private void ShowStatusTooltip(ElementReference elementReference) =>
+		TooltipService.Open(elementReference, "Filter tickets by workflow status. Open = newly created, InProgress = crew assigned, Resolved = work complete, Closed = verified and archived", new TooltipOptions { Position = TooltipPosition.Top });
+
+	private void ShowPriorityTooltip(ElementReference elementReference) =>
+		TooltipService.Open(elementReference, "Show only tickets at or above this priority level. Critical = immediate response required, High = significant impact, Medium = normal operations, Low = routine maintenance", new TooltipOptions { Position = TooltipPosition.Top });
+
+	private void ShowTimelineTooltip(ElementReference elementReference) =>
+		TooltipService.Open(elementReference, "Load full event timeline for each ticket. Disabling improves performance when viewing many tickets.", new TooltipOptions { Position = TooltipPosition.Top });
+
+	private void ShowRecommendationsHelpTooltip(ElementReference elementReference) =>
+		TooltipService.Open(elementReference, "Load AI-generated crew dispatch recommendations for each ticket. Adds additional data to support dispatch workflow.", new TooltipOptions { Position = TooltipPosition.Top });
+
 	private bool ShowDuplicateWarning(TicketDto ticket) => ticket.Events.Any(evt => evt.EventType == AssignmentEventType.TicketDuplicateFlag);
 
 	private bool CanPromoteSelectedTicket => selectedTicket is not null && GetNextStatus(selectedTicket.Status) is not null;
@@ -553,10 +588,12 @@
 		public string OutageReferenceId { get; set; } = string.Empty;
 
 		public string? Description { get; set; }
-		public TicketPriority Priority { get; set; } = TicketPriority.Medium;
+		
+		[Required(ErrorMessage = "Priority is required.")]
+		public TicketPriority? Priority { get; set; }
 
 		[Range(0, 100000, ErrorMessage = "Customer impact must be non-negative.")]
-		public int CustomerImpact { get; set; }
+		public int? CustomerImpact { get; set; }
 
 		public string AssetsInput { get; set; } = string.Empty;
 

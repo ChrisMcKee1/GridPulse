@@ -22,6 +22,12 @@ internal static class DispatchEndpointGroup
         group.MapPost("/assignments", PublishAssignmentAsync)
             .WithName("PublishAssignment");
 
+        group.MapDelete("/crews/{crewId:guid}", DeleteCrewAsync)
+            .WithName("DeleteCrew");
+
+        group.MapPost("/crews/batch-delete", DeleteCrewsBatchAsync)
+            .WithName("DeleteCrewsBatch");
+
         return group;
     }
 
@@ -78,6 +84,55 @@ internal static class DispatchEndpointGroup
         catch (InvalidOperationException ex)
         {
             return NotFoundProblem(ex.Message);
+        }
+    }
+
+    private static async Task<IResult> DeleteCrewAsync(
+        Guid crewId,
+        IDispatchRepository dispatchRepository,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dispatchRepository.DeleteCrewAsync(crewId, cancellationToken).ConfigureAwait(false);
+            await dispatchRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Results.NoContent();
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(new ProblemDetails
+            {
+                Title = "Failed to delete crew",
+                Detail = ex.Message,
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
+    }
+
+    private static async Task<IResult> DeleteCrewsBatchAsync(
+        [FromBody] CrewBatchDeleteRequest request,
+        IDispatchRepository dispatchRepository,
+        CancellationToken cancellationToken)
+    {
+        if (request?.CrewIds is null || !request.CrewIds.Any())
+        {
+            return ValidationProblem("At least one crew ID is required.");
+        }
+
+        try
+        {
+            await dispatchRepository.DeleteCrewsAsync(request.CrewIds, cancellationToken).ConfigureAwait(false);
+            await dispatchRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { DeletedCount = request.CrewIds.Count() });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(new ProblemDetails
+            {
+                Title = "Failed to delete crews",
+                Detail = ex.Message,
+                Status = StatusCodes.Status500InternalServerError
+            });
         }
     }
 

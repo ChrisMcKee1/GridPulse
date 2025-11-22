@@ -14,17 +14,13 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<SampleDataOptions>()
-            .Bind(configuration.GetSection(SampleDataOptions.SectionName))
-            .ValidateOnStart();
-        services.AddOptions<TicketSeedOptions>()
-            .Bind(configuration.GetSection(TicketSeedOptions.SectionName))
+        services.AddOptions<UtilitySampleDataOptions>()
+            .Bind(configuration.GetSection(UtilitySampleDataOptions.SectionName))
             .ValidateOnStart();
 
         services.AddMockUserContext(configuration);
 
-        services.AddScoped<IDataSeeder, OutageCsvSampleDataSeeder>();
-        services.AddScoped<IDataSeeder, TicketSeed>();
+        services.AddScoped<IDataSeeder, UtilitySampleDataSeeder>();
 
         services.AddSingleton<MockCrewTelemetryFeed>();
         services.AddSingleton<ICrewTelemetryFeed>(sp => sp.GetRequiredService<MockCrewTelemetryFeed>());

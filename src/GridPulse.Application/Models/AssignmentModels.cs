@@ -1,7 +1,22 @@
-using System;
-using System.Collections.Generic;
-
 namespace GridPulse.Application.Models;
+
+// ===== DTOs =====
+
+public sealed record AssignmentEventDto(
+    Guid Id,
+    AssignmentEventType EventType,
+    string Actor,
+    DateTimeOffset OccurredAt,
+    Guid? CrewId,
+    IReadOnlyDictionary<string, string> Details
+);
+
+public sealed record AssignmentReceiptDto(
+    Guid TicketId,
+    Guid CrewId,
+    string DeliveryStatus,
+    string TrackingId
+);
 
 /// <summary>
 /// Snapshot of the dispatcher decision passed to crew delivery transports.

@@ -1,5 +1,0 @@
-Id,OutageId,Timestamp,Type,StatusFrom,StatusTo,Message,CreatedBy
-b1a4b46c-6e54-4d79-b3cb-9d537c8af901,17aa5a0f-4f5f-45ec-8dc0-1b53e876c111,2024-10-18T14:45:00Z,StatusChange,Reported,Acknowledged,Outage acknowledged,system
-28e6938d-3f23-4f44-b1ff-83c2d59823c0,17aa5a0f-4f5f-45ec-8dc0-1b53e876c111,2024-10-18T15:05:00Z,StatusChange,Acknowledged,CrewDispatched,Crew dispatched,dispatcher
-6ad7cb9f-f8d9-4ed1-8ba7-2717d5c9f2f1,4a9b1df4-daa0-4cf1-bd83-3cb7631c55af,2024-11-02T09:20:00Z,StatusChange,Reported,Acknowledged,Operator confirmed outage,system
-8c8b316d-52f2-4c45-b865-dbc5c1c7a9d5,6c27f6cc-857d-4162-9de9-a2febb8b6b9d,2024-11-10T02:12:00Z,OperatorNote,,,Initial customer report captured,csr

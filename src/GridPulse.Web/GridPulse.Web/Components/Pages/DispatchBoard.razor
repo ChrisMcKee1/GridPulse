@@ -104,25 +104,31 @@
             <RadzenStack Gap="1rem" Style="height: 100%; padding: 0.5rem; overflow-y: auto;">
                 <RadzenCard class="dispatch-recommendations-card">
                     <RadzenStack Gap="12px">
-                        <RadzenStack Gap="0.25rem">
-                            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Recommendations</RadzenText>
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Crew recommendations</RadzenText>
                             @if (selectedTicket is not null)
                             {
                                 <RadzenText TextStyle="TextStyle.Body2" Class="dispatch-subtitle">@selectedTicket.Title</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-text-secondary-color);">
+                                    AI-recommended crews based on proximity, skills, workload, and availability. <RadzenIcon Icon="star" Style="font-size: 14px; vertical-align: middle;" /> = Best match
+                                </RadzenText>
                             }
-                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" Wrap="FlexWrap.Wrap" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                @if (selectedRecommendation is not null)
-                                {
-                                    <RadzenText TextStyle="TextStyle.Caption">
-                                        Selected crew: <RadzenText TextStyle="TextStyle.Subtitle2" Style="display: inline;">@selectedRecommendation.Crew.DisplayName</RadzenText>
-                                    </RadzenText>
-                                }
-                                @if (selectedTicket is not null)
-                                {
-                                    <RadzenText TextStyle="TextStyle.Caption">Updated @selectedTicket.UpdatedAt.ToLocalTime().ToString("g")</RadzenText>
-                                }
-                            </RadzenStack>
                         </RadzenStack>
+
+                    @if (selectedRecommendation is not null && !selectedRecommendation.IsAutoSelected)
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Start">
+                                <RadzenIcon Icon="info" Style="margin-top: 2px;" />
+                                <RadzenStack Gap="0.25rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2">Override required</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Body2">
+                                        You've selected <strong>@selectedRecommendation.Crew.DisplayName</strong> instead of the AI-recommended crew. Click the button below to provide a justification.
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenAlert>
+                    }
 
                     @if (isLoadingRecommendations)
                     {
@@ -142,10 +148,10 @@
 
                         <RadzenDataGrid TItem="DispatchRecommendationDto" 
                                        Data="@recommendations" 
+                                       @bind-Value="@selectedRecommendations"
                                        SelectionMode="DataGridSelectionMode.Single"
                                        AllowRowSelectOnRowClick="true"
                                        RowSelect="@(args => OnRecommendationSelected(args))"
-                                       RowRender="@(args => OnRowRender(args))"
                                        data-testid="crew-recommendations-grid"
                                        AllowSorting="true"
                                        Style="margin: 1rem 0;">
@@ -181,32 +187,63 @@
                                         </RadzenStack>
                                     </Template>
                                 </RadzenDataGridColumn>
-                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Status" Width="120px">
+                                <RadzenDataGridColumn TItem="DispatchRecommendationDto" Title="Status" Width="100px" Sortable="false">
                                     <Template Context="recommendation">
-                                        <RadzenStack Gap="0.25rem">
-                                            @if (recommendation.IsAutoSelected)
-                                            {
-                                                <RadzenBadge Text="Auto" BadgeStyle="BadgeStyle.Info" />
-                                            }
-                                            @if (recommendation.IsOverride && !string.IsNullOrWhiteSpace(recommendation.OverrideReason))
-                                            {
-                                                <RadzenBadge Text="@($"Override: {recommendation.OverrideReason}")" BadgeStyle="BadgeStyle.Warning" />
-                                            }
-                                        </RadzenStack>
+                                        @if (recommendation.IsAutoSelected)
+                                        {
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" AlignItems="AlignItems.Center">
+                                                <RadzenIcon Icon="star" Style="color: var(--rz-info);" />
+                                                <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: var(--rz-info);">Recommended</RadzenText>
+                                            </RadzenStack>
+                                        }
+                                        else if (recommendation.IsOverride && !string.IsNullOrWhiteSpace(recommendation.OverrideReason))
+                                        {
+                                            <RadzenBadge Text="@($"Override: {recommendation.OverrideReason}")" BadgeStyle="BadgeStyle.Warning" />
+                                        }
                                     </Template>
                                 </RadzenDataGridColumn>
                             </Columns>
                         </RadzenDataGrid>
                     }
 
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="8px">
-                        <RadzenButton Icon="check" Disabled="@(!CanPublishAssignment)" Click="async () => await PublishAssignmentAsync(isOverride: false)" data-testid="dispatch-publish">
-                            @(isPublishingAssignment ? "Publishing..." : "Publish assignment")
+                    @if (selectedRecommendation is not null)
+                    {
+                        var isOverrideSelection = !selectedRecommendation.IsAutoSelected;
+                        var buttonIcon = isOverrideSelection ? "edit_note" : "check_circle";
+                        var buttonStyle = isOverrideSelection ? ButtonStyle.Warning : ButtonStyle.Success;
+                        var buttonText = isPublishingAssignment ? "Publishing..." : 
+                                        isOverrideSelection ? $"Provide reason to assign {selectedRecommendation.Crew.DisplayName}" : 
+                                        $"Assign {selectedRecommendation.Crew.DisplayName}";
+
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenButton Icon="@buttonIcon" 
+                                         ButtonStyle="@buttonStyle"
+                                         Disabled="@(!CanPublishAssignment)" 
+                                         Click="HandlePublishClickAsync" 
+                                         data-testid="dispatch-publish"
+                                         Style="width: 100%;">
+                                @buttonText
+                            </RadzenButton>
+                            @if (isOverrideSelection)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-text-secondary-color); text-align: center;">
+                                    <RadzenIcon Icon="warning" Style="font-size: 12px; vertical-align: middle;" /> Selecting a different crew than recommended requires justification
+                                </RadzenText>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-success); text-align: center;">
+                                    <RadzenIcon Icon="check_circle" Style="font-size: 12px; vertical-align: middle;" /> Using AI-recommended crew
+                                </RadzenText>
+                            }
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenButton Icon="check_circle" Disabled="true" data-testid="dispatch-publish" Style="width: 100%;">
+                            Select a crew from the list above
                         </RadzenButton>
-                        <RadzenButton ButtonStyle="ButtonStyle.Light" Icon="swap_horiz" Disabled="@(!CanPublishAssignment)" Click="OpenOverrideDialog" data-testid="dispatch-override-button">
-                            Override selection
-                        </RadzenButton>
-                    </RadzenStack>
+                    }
                 </RadzenStack>
                 </RadzenCard>
 
@@ -245,6 +282,7 @@
     private Guid? selectedTicketId;
     private IReadOnlyList<DispatchRecommendationDto> recommendations = Array.Empty<DispatchRecommendationDto>();
     private DispatchRecommendationDto? selectedRecommendation;
+    private IList<DispatchRecommendationDto> selectedRecommendations = new List<DispatchRecommendationDto>();
     private bool isLoadingTickets = true;
     private bool isLoadingRecommendations;
     private bool isSubmittingCrewStatus;
@@ -335,16 +373,6 @@
         }
     }
 
-    private void OnRowRender(RowRenderEventArgs<DispatchRecommendationDto> args)
-    {
-        var isSelected = selectedRecommendation != null && 
-                        args.Data.Crew.CrewId == selectedRecommendation.Crew.CrewId;
-        
-        args.Attributes.Add("class", isSelected 
-            ? "rz-state-highlight" 
-            : string.Empty);
-    }
-
     private void OnRecommendationSelected(DispatchRecommendationDto recommendation)
     {
         selectedRecommendation = recommendation;
@@ -410,6 +438,24 @@
         await LoadRecommendationsAsync(ticket.Id);
     }
 
+    private async Task HandleOverrideSendAsync(DialogService ds)
+    {
+        // Refresh recommendations right before sending to ensure they're current
+        if (selectedTicket?.Id is Guid ticketId)
+        {
+            Logger.LogInformation("Refreshing recommendations before override dispatch");
+            await LoadRecommendationsAsync(ticketId);
+        }
+        
+        await PublishAssignmentAsync(isOverride: true);
+        
+        // Only close dialog if there was no error
+        if (string.IsNullOrEmpty(overrideErrorMessage))
+        {
+            ds.Close(true);
+        }
+    }
+
     private async Task OpenOverrideDialog()
     {
         if (!CanPublishAssignment)
@@ -447,7 +493,7 @@
                     <RadzenButton Icon="send" 
                                   ButtonStyle="ButtonStyle.Primary" 
                                   Disabled="@isPublishingAssignment" 
-                                  Click="async () => { await PublishAssignmentAsync(isOverride: true); ds.Close(true); }"
+                                  Click="async () => await HandleOverrideSendAsync(ds)"
                                   data-testid="dispatch-override-send">
                         @(isPublishingAssignment ? "Sending..." : "Send assignment")
                     </RadzenButton>
@@ -468,6 +514,37 @@
 
         string dialogResult = result != null ? result.ToString() : "cancelled";
         Logger.LogInformation("Override dialog closed with result: {Result}", dialogResult);
+    }
+
+    private async Task HandlePublishClickAsync()
+    {
+        if (selectedRecommendation is null)
+        {
+            return;
+        }
+
+        // If the selected recommendation is NOT auto-selected, require an override reason
+        if (!selectedRecommendation.IsAutoSelected)
+        {
+            Logger.LogInformation("Selected crew is not auto-selected, opening override dialog");
+            await OpenOverrideDialog();
+            return;
+        }
+
+        // Otherwise, proceed with normal publish
+        await PublishAssignmentAsync(isOverride: false);
+    }
+    
+    private static string ExtractFriendlyErrorMessage(string errorMessage)
+    {
+        // Error format from API: "409 Conflict: Recommendation is stale..."
+        if (errorMessage.Contains(':') && errorMessage.Contains("Conflict"))
+        {
+            var parts = errorMessage.Split(':', 2);
+            return parts.Length > 1 ? parts[1].Trim() : errorMessage;
+        }
+        
+        return errorMessage;
     }
 
     private async Task PublishAssignmentAsync(bool isOverride)
@@ -505,10 +582,37 @@
             NotificationService.Notify(NotificationSeverity.Success, "Assignment queued", lastReceiptMessage);
             Logger.LogInformation("Assignment published for ticket {TicketId} with tracking {TrackingId}", selectedTicket.Id, receipt.TrackingId);
         }
+        catch (HttpRequestException ex)
+        {
+            // Extract friendly error message from HTTP exception (includes ProblemDetails)
+            var friendlyMessage = ExtractFriendlyErrorMessage(ex.Message);
+            
+            if (isOverride)
+            {
+                overrideErrorMessage = friendlyMessage;
+            }
+            else
+            {
+                errorMessage = $"Unable to publish assignment: {friendlyMessage}";
+                NotificationService.Notify(NotificationSeverity.Error, "Assignment failed", friendlyMessage);
+            }
+            
+            Logger.LogError(ex, "Failed to publish assignment for ticket {TicketId}", selectedTicket.Id);
+        }
         catch (Exception ex)
         {
-            errorMessage = $"Unable to publish assignment: {ex.Message}";
-            NotificationService.Notify(NotificationSeverity.Error, "Assignment failed", ex.Message);
+            var message = ex.Message;
+            
+            if (isOverride)
+            {
+                overrideErrorMessage = message;
+            }
+            else
+            {
+                errorMessage = $"Unable to publish assignment: {message}";
+                NotificationService.Notify(NotificationSeverity.Error, "Assignment failed", message);
+            }
+            
             Logger.LogError(ex, "Failed to publish assignment for ticket {TicketId}", selectedTicket.Id);
         }
         finally

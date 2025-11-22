@@ -111,10 +111,30 @@ internal sealed class EfTicketRepository : ITicketRepository
         return ticket;
     }
 
+    public async Task<IReadOnlyCollection<Ticket>> GetByIdsAsync(IEnumerable<Guid> ticketIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ticketIds);
+        var ticketIdSet = ticketIds.ToHashSet();
+
+        var tickets = await Tickets
+            .AsNoTracking()
+            .Where(t => ticketIdSet.Contains(t.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return tickets;
+    }
+
     public async Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         await Tickets.AddAsync(ticket, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task AddRangeAsync(IEnumerable<Ticket> tickets, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tickets);
+        await Tickets.AddRangeAsync(tickets, cancellationToken).ConfigureAwait(false);
     }
 
     public Task UpdateAsync(Ticket ticket, CancellationToken cancellationToken = default)
@@ -151,6 +171,53 @@ internal sealed class EfTicketRepository : ITicketRepository
 
         // Immutable ticket clones always bump the audit version by 1; expose the prior value so EF's concurrency check succeeds.
         auditProperty.OriginalValue = currentVersion - 1;
+    }
+
+    public Task UpdateRangeAsync(IEnumerable<Ticket> tickets, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tickets);
+
+        foreach (var ticket in tickets)
+        {
+            var local = Tickets.Local.FirstOrDefault(t => t.Id == ticket.Id);
+            if (local is not null)
+            {
+                _dbContext.Entry(local).State = EntityState.Detached;
+            }
+
+            Tickets.Update(ticket);
+            ApplyAuditVersionOriginalValue(ticket);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task DeleteAsync(Guid ticketId, CancellationToken cancellationToken = default)
+    {
+        var ticket = await Tickets
+            .FirstOrDefaultAsync(t => t.Id == ticketId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (ticket is not null)
+        {
+            Tickets.Remove(ticket);
+        }
+    }
+
+    public async Task DeleteRangeAsync(IEnumerable<Guid> ticketIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ticketIds);
+        var ticketIdSet = ticketIds.ToHashSet();
+
+        var tickets = await Tickets
+            .Where(t => ticketIdSet.Contains(t.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (tickets.Count > 0)
+        {
+            Tickets.RemoveRange(tickets);
+        }
     }
 
     public async Task AddEventsAsync(IEnumerable<AssignmentEvent> events, CancellationToken cancellationToken = default)

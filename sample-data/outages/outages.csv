@@ -1,4 +1,0 @@
-Id,ServiceLocationId,ServiceAddress,Status,ReportedAt,LastUpdatedAt,EstimatedRestoration,Cause
-17aa5a0f-4f5f-45ec-8dc0-1b53e876c111,f0b8c3a0-4f85-4f50-9b26-7b6b4c1cf001,"123 Contoso Ave, Apex, NC",CrewDispatched,2024-10-18T14:30:00Z,2024-10-18T15:30:00Z,2024-10-18T18:30:00Z,Tree on line
-4a9b1df4-daa0-4cf1-bd83-3cb7631c55af,22dfbe23-8a1d-4319-b616-c0b8e02d4ac4,"56 Northbridge Rd, Cary, NC",Acknowledged,2024-11-02T09:05:00Z,2024-11-02T09:30:00Z,,Equipment fault
-6c27f6cc-857d-4162-9de9-a2febb8b6b9d,54de0f1f-92ae-4d20-a1a2-2210ad1841a0,"800 Lake Union Blvd, Seattle, WA",Reported,2024-11-10T02:10:00Z,2024-11-10T02:10:00Z,,Storm damage

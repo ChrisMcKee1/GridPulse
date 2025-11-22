@@ -132,6 +132,44 @@
     background: var(--rz-info);
 }
 
+/* Dispatch board - Radzen DataGrid selected row enhancement */
+.rz-datatable-row-selected,
+.rz-datatable tr.rz-datatable-row-selected td {
+    background-color: var(--rz-primary) !important;
+    color: var(--rz-on-primary) !important;
+    font-weight: 600 !important;
+    border-left: 4px solid var(--rz-success) !important;
+}
+
+.rz-datatable-row-selected:hover,
+.rz-datatable tr.rz-datatable-row-selected:hover td {
+    background-color: var(--rz-primary-darker) !important;
+}
+
+/* Dark mode override for better readability */
+[data-bs-theme="dark"] .rz-datatable-row-selected,
+[data-bs-theme="dark"] .rz-datatable tr.rz-datatable-row-selected td {
+    color: var(--rz-base-50) !important;
+}
+
+/* Legacy dispatch-row-selected class (can be removed if not used elsewhere) */
+.dispatch-row-selected {
+    background: var(--rz-primary) !important;
+    color: var(--rz-primary-darker) !important;
+    font-weight: 600;
+    border-left: 4px solid var(--rz-success) !important;
+    box-shadow: inset 0 0 0 1px var(--rz-primary-light);
+}
+
+.dispatch-row-selected:hover {
+    background: var(--rz-primary-lighter) !important;
+}
+
+/* Override row text color for dark mode readability */
+[data-bs-theme="dark"] .dispatch-row-selected {
+    color: var(--rz-base-900) !important;
+}
+
 /* Tickets page specific styles */
 .tickets-page {
     padding: 1.5rem;

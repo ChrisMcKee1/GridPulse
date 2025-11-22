@@ -104,8 +104,30 @@ public static class GridPulseApiClientExtensions
         var response = await client.HttpClient
             .PostAsJsonAsync("api/dispatch/assignments", request, SerializerOptions, cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorDetail = await TryExtractProblemDetailAsync(response);
+            throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}: {errorDetail}");
+        }
+
         return await DeserializeAsync<AssignmentReceiptDto>(response.Content, cancellationToken);
+    }
+
+    private static async Task<string> TryExtractProblemDetailAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            if (problemDetails.TryGetProperty("detail", out var detail))
+            {
+                return detail.GetString() ?? response.ReasonPhrase ?? "Unknown error";
+            }
+            return response.ReasonPhrase ?? "Unknown error";
+        }
+        catch
+        {
+            return response.ReasonPhrase ?? "Unknown error";
+        }
     }
 
     public static async Task<CrewStatusUpdateResponse> PostCrewStatusAsync(

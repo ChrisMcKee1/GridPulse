@@ -29,6 +29,12 @@ internal static class TicketsEndpointGroup
         group.MapPatch("/{ticketId:guid}/status", UpdateTicketStatusAsync)
             .WithName("UpdateTicketStatus");
 
+        group.MapDelete("/{ticketId:guid}", DeleteTicketAsync)
+            .WithName("DeleteTicket");
+
+        group.MapPost("/batch-delete", DeleteTicketsBatchAsync)
+            .WithName("DeleteTicketsBatch");
+
         return group;
     }
 
@@ -209,6 +215,55 @@ internal static class TicketsEndpointGroup
 
         var raw = values[^1];
         return bool.TryParse(raw, out var parsed) && parsed;
+    }
+
+    private static async Task<IResult> DeleteTicketAsync(
+        Guid ticketId,
+        ITicketRepository ticketRepository,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ticketRepository.DeleteAsync(ticketId, cancellationToken).ConfigureAwait(false);
+            await ticketRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Results.NoContent();
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(new ProblemDetails
+            {
+                Title = "Failed to delete ticket",
+                Detail = ex.Message,
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
+    }
+
+    private static async Task<IResult> DeleteTicketsBatchAsync(
+        [FromBody] TicketBatchDeleteRequest request,
+        ITicketRepository ticketRepository,
+        CancellationToken cancellationToken)
+    {
+        if (request?.TicketIds is null || !request.TicketIds.Any())
+        {
+            return ValidationProblem("At least one ticket ID is required.");
+        }
+
+        try
+        {
+            await ticketRepository.DeleteRangeAsync(request.TicketIds, cancellationToken).ConfigureAwait(false);
+            await ticketRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { DeletedCount = request.TicketIds.Count() });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(new ProblemDetails
+            {
+                Title = "Failed to delete tickets",
+                Detail = ex.Message,
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
     }
 
     private static IResult ValidationProblem(string detail) =>

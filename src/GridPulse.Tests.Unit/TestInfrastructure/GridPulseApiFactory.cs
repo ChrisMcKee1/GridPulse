@@ -24,7 +24,7 @@ public sealed class GridPulseApiFactory : WebApplicationFactory<GridPulseWebApi:
             var overrides = new Dictionary<string, string?>
             {
                 ["Authentication:Provider"] = "Mock",
-                [$"{SampleDataOptions.SectionName}:RootPath"] = "sample-data"
+                [$"{UtilitySampleDataOptions.SectionName}:ServiceTerritories:0"] = "North"
             };
 
             configBuilder.AddInMemoryCollection(overrides);

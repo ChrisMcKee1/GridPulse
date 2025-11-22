@@ -4,6 +4,48 @@ const dispatcherNavLabel = 'Dispatch';
 const dispatchHeading = /Dispatch Board/i;
 const ticketsHeading = /Ticket/i;
 
+// Track created tickets for cleanup
+const createdTicketIds: string[] = [];
+
+// Helper to extract ticket ID from grid row
+const extractTicketIdFromRow = async (row: Locator): Promise<string | null> => {
+  try {
+    const idCell = row.locator('td').first();
+    const idText = await idCell.textContent();
+    return idText?.trim() || null;
+  } catch {
+    return null;
+  }
+};
+
+// Helper to cleanup all created tickets using batch delete
+const cleanupCreatedTickets = async (baseURL: string) => {
+  if (createdTicketIds.length === 0) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${baseURL}/api/tickets/batch-delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ticketIds: createdTicketIds
+      }),
+    });
+
+    if (response.ok) {
+      console.log(`✓ Cleaned up ${createdTicketIds.length} test tickets`);
+      createdTicketIds.length = 0; // Clear the array
+    } else {
+      console.warn(`⚠ Failed to cleanup tickets: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('✗ Error during ticket cleanup:', error);
+  }
+};
+
 const navigateToTickets = async (page: Page) => {
   await page.goto('/tickets');
   // RadzenText with TagName.H1 renders as <h1> element
@@ -66,17 +108,21 @@ test.describe('Dispatcher board workflows', () => {
     await expect(recommendationsGrid).toBeVisible({ timeout: 15000 });
     
     const rows = recommendationsGrid.getByRole('row');
-    // Wait for at least 2 rows (header + 1 data row)
-    await expect(rows.nth(1)).toBeVisible({ timeout: 10000 });
-    await rows.nth(1).click(); // skip header row, click first data row
+    // Wait for at least 3 rows (header + 2 data rows) so we can select a non-recommended crew
+    await expect(rows.nth(2)).toBeVisible({ timeout: 10000 });
+    // Click second data row (third row including header) - this should NOT be the auto-selected crew
+    await rows.nth(2).click();
 
-    // Wait for Override button to be enabled after row selection - use testid
-    const overrideButton = page.getByTestId('dispatch-override-button');
-    await expect(overrideButton).toBeEnabled({ timeout: 10000 });
+    // After selecting a non-recommended crew, the publish button should change to orange "Provide reason..." style
+    // and clicking it should open the override dialog automatically
+    const publishButton = page.getByTestId('dispatch-publish');
+    await expect(publishButton).toBeEnabled({ timeout: 10000 });
+    // Button text should indicate override is needed
+    await expect(publishButton).toContainText(/Provide reason/i);
     
     // Add small delay to ensure InteractiveServer has processed the state
     await page.waitForTimeout(500);
-    await overrideButton.click();
+    await publishButton.click();
     
     // Wait for dialog to appear - use testid for the textarea as reliable indicator
     const overrideReasonField = page.getByTestId('override-reason');
@@ -136,6 +182,11 @@ test.describe('Dispatcher board workflows', () => {
 });
 
 test.describe('Tickets page button wiring', () => {
+  // Cleanup after all tests in this describe block
+  test.afterAll(async ({ baseURL }) => {
+    await cleanupCreatedTickets(baseURL || 'http://localhost:7210');
+  });
+
   test('refresh, create, and cancel flows work correctly', async ({ page }) => {
     await navigateToTickets(page);
     await scrollThroughPage(page);
@@ -160,7 +211,14 @@ test.describe('Tickets page button wiring', () => {
     await page.getByTestId('tickets-create-submit').click();
 
     // Wait for the new ticket to appear in the grid
-    await expect(page.getByTestId('tickets-grid').locator('tr').filter({ hasText: ticketTitle })).toBeVisible({ timeout: 10000 });
+    const createdRow = page.getByTestId('tickets-grid').locator('tr').filter({ hasText: ticketTitle });
+    await expect(createdRow).toBeVisible({ timeout: 10000 });
+
+    // Track ticket ID for cleanup
+    const ticketId = await extractTicketIdFromRow(createdRow);
+    if (ticketId) {
+      createdTicketIds.push(ticketId);
+    }
 
     // Test cancel button
     await page.getByTestId('tickets-new').click();
@@ -192,6 +250,14 @@ test.describe('Tickets page button wiring', () => {
     // Wait for ticket to be created and selected
     await expect(page.getByRole('heading', { level: 3, name: ticketTitle })).toBeVisible({ timeout: 10000 });
 
+    // Track ticket ID for cleanup
+    const grid = page.getByTestId('tickets-grid');
+    const createdRow = grid.locator('tr').filter({ hasText: ticketTitle });
+    const ticketId = await extractTicketIdFromRow(createdRow);
+    if (ticketId) {
+      createdTicketIds.push(ticketId);
+    }
+
     // Get the current status
     const statusValue = page.getByTestId('ticket-status-value');
     const previousStatus = (await statusValue.textContent())?.trim();
@@ -201,7 +267,6 @@ test.describe('Tickets page button wiring', () => {
     await expect(statusValue).not.toHaveText(previousStatus ?? '', { timeout: 10000 });
 
     // Test reset selection
-    const grid = page.getByTestId('tickets-grid');
     const firstRowTitle = (await grid.locator('tbody tr').first().locator('td').first().textContent())?.trim() ?? '';
     
     const secondRow = grid.locator('tbody tr').nth(1);

@@ -17,9 +17,24 @@ internal sealed class EfDispatchRepository(GridPulseDbContext dbContext) : IDisp
         return crews;
     }
 
+    public async Task<IReadOnlyCollection<Crew>> GetCrewsByIdsAsync(IEnumerable<Guid> crewIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(crewIds);
+        var crewIdSet = crewIds.ToHashSet();
+        
+        var crews = await dbContext.Crews
+            .AsNoTracking()
+            .Where(c => crewIdSet.Contains(c.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return crews;
+    }
+
     public async Task<Crew?> GetCrewByIdAsync(Guid crewId, CancellationToken cancellationToken = default)
     {
         var crew = await dbContext.Crews
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == crewId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -32,11 +47,64 @@ internal sealed class EfDispatchRepository(GridPulseDbContext dbContext) : IDisp
         await dbContext.Crews.AddAsync(crew, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task AddCrewsAsync(IEnumerable<Crew> crews, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(crews);
+        await dbContext.Crews.AddRangeAsync(crews, cancellationToken).ConfigureAwait(false);
+    }
+
     public Task UpdateCrewAsync(Crew crew)
     {
         ArgumentNullException.ThrowIfNull(crew);
-        dbContext.Crews.Update(crew);
+        
+        var existingEntry = dbContext.ChangeTracker.Entries<Crew>()
+            .FirstOrDefault(e => e.Entity.Id == crew.Id);
+        
+        if (existingEntry is not null)
+        {
+            existingEntry.CurrentValues.SetValues(crew);
+        }
+        else
+        {
+            dbContext.Crews.Update(crew);
+        }
+        
         return Task.CompletedTask;
+    }
+
+    public Task UpdateCrewsAsync(IEnumerable<Crew> crews)
+    {
+        ArgumentNullException.ThrowIfNull(crews);
+        dbContext.Crews.UpdateRange(crews);
+        return Task.CompletedTask;
+    }
+
+    public async Task DeleteCrewAsync(Guid crewId, CancellationToken cancellationToken = default)
+    {
+        var crew = await dbContext.Crews
+            .FirstOrDefaultAsync(c => c.Id == crewId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (crew is not null)
+        {
+            dbContext.Crews.Remove(crew);
+        }
+    }
+
+    public async Task DeleteCrewsAsync(IEnumerable<Guid> crewIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(crewIds);
+        var crewIdSet = crewIds.ToHashSet();
+        
+        var crews = await dbContext.Crews
+            .Where(c => crewIdSet.Contains(c.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (crews.Count > 0)
+        {
+            dbContext.Crews.RemoveRange(crews);
+        }
     }
 
     public async Task<CrewLocationSnapshot?> GetLatestLocationAsync(Guid crewId, CancellationToken cancellationToken = default)

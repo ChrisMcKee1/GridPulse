@@ -85,10 +85,12 @@ public sealed class DispatchOptimizationServiceTests
         envelope.Recommendations.Should().HaveCount(2);
         envelope.Recommendations.First().Crew.CrewId.Should().Be(freshCrew.Id, "fresh telemetry should retain a higher composite score");
 
+        var freshRecommendation = envelope.Recommendations.Single(r => r.Crew.CrewId == freshCrew.Id);
         var staleRecommendation = envelope.Recommendations.Single(r => r.Crew.CrewId == staleCrew.Id);
+        
         staleRecommendation.Crew.IsTelemetryStale.Should().BeTrue();
-        staleRecommendation.CompositeScore.Should().BeLessThan(envelope.Recommendations.First().CompositeScore);
-        staleRecommendation.ScoreComponents["distance"].Should().BeLessThan(envelope.Recommendations.First().ScoreComponents["distance"]);
+        staleRecommendation.CompositeScore.Should().BeLessThan(freshRecommendation.CompositeScore, "stale telemetry should have lower composite score");
+        staleRecommendation.ScoreComponents["distance"].Should().BeLessThan(freshRecommendation.ScoreComponents["distance"], "stale telemetry should have distance penalty applied");
     }
 
     private DispatchOptimizationService CreateService()
