@@ -427,8 +427,9 @@ FodyWeavers.xsd
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Aspire generated files
+# Aspire generated files (but keep settings.json for repo cloning)
 .aspire/
+!.aspire/settings.json
 
 # User secrets (NEVER commit these)
 **/appsettings.*.local.json
